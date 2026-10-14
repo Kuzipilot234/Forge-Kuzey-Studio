@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Forge Kuzey Studio</title>
-  <meta name="description" content="Turn a scenario into consistent, cinematic, scene-by-scene prompts for Gemini / Veo video generation.">
+  <meta name="description" content="Turn an idea into ready-to-paste, scene-by-scene video prompts for Gemini (Veo).">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,176 +13,199 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">
-      <span class="logo">🎬</span>
-      <div>
-        <h1>Forge Kuzey Studio<span class="rec" aria-hidden="true"></span></h1>
-        <p class="tag">Scenario → scene-by-scene AI video prompts for Gemini / Veo</p>
-      </div>
-    </div>
+    <a class="brand" href="./" aria-label="Forge Kuzey Studio">
+      <span class="clap" aria-hidden="true"></span>
+      <span>
+        <span class="brand-name">Forge Kuzey Studio</span>
+        <span class="tagline" data-i18n="app.tagline"></span>
+      </span>
+    </a>
     <div class="top-actions">
-      <button class="ghost" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌓</button>
-      <button class="ghost" id="historyBtn">🕘 History</button>
+      <label class="lang">
+        <span class="sr" data-i18n="nav.lang"></span>
+        <span aria-hidden="true">🌐</span>
+        <select id="lang"></select>
+      </label>
+      <button class="icon-btn" id="historyBtn"><span aria-hidden="true">🕘</span> <span class="hide-sm" data-i18n="nav.history"></span></button>
+      <button class="icon-btn" id="themeBtn" data-i18n-title="nav.theme"><span aria-hidden="true">◐</span></button>
     </div>
   </header>
 
-  <main class="wrap">
-    <section class="panel">
-      <div class="panel-head">
-        <h2>1 · Choose a category</h2>
-        <input id="catSearch" class="search" type="search" placeholder="Filter categories…">
+  <main class="layout">
+    <section class="wizard">
+      <ol class="stepper" id="stepper">
+        <li><button data-step="1"><span class="dot">1</span><span data-i18n="step.1"></span></button></li>
+        <li><button data-step="2"><span class="dot">2</span><span data-i18n="step.2"></span></button></li>
+        <li><button data-step="3"><span class="dot">3</span><span data-i18n="step.3"></span></button></li>
+      </ol>
+
+      <!-- Step 1: idea -->
+      <div class="step" id="step1">
+        <h1 data-i18n="s1.title"></h1>
+        <p class="sub" data-i18n="s1.sub"></p>
+        <textarea id="idea" rows="6" data-i18n-ph="s1.placeholder"></textarea>
+        <div class="row-between">
+          <div class="btn-row">
+            <button class="soft" id="surpriseBtn"><span aria-hidden="true">🎲</span> <span data-i18n="s1.surprise"></span></button>
+            <button class="soft" id="improveBtn"><span aria-hidden="true">✨</span> <span data-i18n="s1.improve"></span></button>
+          </div>
+          <span class="count" id="ideaCount"></span>
+        </div>
+        <p class="label" data-i18n="s1.examples"></p>
+        <div class="chips" id="examples"></div>
+        <div class="step-nav">
+          <span></span>
+          <button class="next" data-go="2"><span data-i18n="s1.next"></span> →</button>
+        </div>
       </div>
-      <div id="categories" class="cat-grid" role="listbox" aria-label="Categories"></div>
+
+      <!-- Step 2: look -->
+      <div class="step" id="step2" hidden>
+        <h1 data-i18n="s2.title"></h1>
+        <h2 class="label" data-i18n="s2.type"></h2>
+        <div class="type-grid" id="types" role="radiogroup"></div>
+        <button class="link-btn" id="moreTypes"></button>
+
+        <h2 class="label" data-i18n="s2.style"></h2>
+        <div class="style-grid" id="styles" role="radiogroup"></div>
+
+        <h2 class="label"><span data-i18n="s2.char"></span> <span class="opt-tag" data-i18n="s2.optional"></span></h2>
+        <p class="hint" data-i18n="s2.charHint"></p>
+        <div class="char-grid">
+          <label><span data-i18n="s2.who"></span><input id="chWho" data-i18n-ph="s2.whoPh"></label>
+          <label><span data-i18n="s2.looks"></span><input id="chLook" data-i18n-ph="s2.looksPh"></label>
+          <label><span data-i18n="s2.outfit"></span><input id="chOutfit" data-i18n-ph="s2.outfitPh"></label>
+          <label><span data-i18n="s2.place"></span><input id="chPlace" data-i18n-ph="s2.placePh"></label>
+        </div>
+        <div class="step-nav">
+          <button class="back" data-go="1">← <span data-i18n="back"></span></button>
+          <button class="next" data-go="3"><span data-i18n="s2.next"></span> →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: format -->
+      <div class="step" id="step3" hidden>
+        <h1 data-i18n="s3.title"></h1>
+        <div class="platforms" id="platforms" role="radiogroup">
+          <button data-pf="vertical" role="radio"><span class="frame f-916"></span><b data-i18n="pf.vertical"></b><small data-i18n="pf.verticalSub"></small></button>
+          <button data-pf="wide" role="radio"><span class="frame f-169"></span><b data-i18n="pf.wide"></b><small data-i18n="pf.wideSub"></small></button>
+          <button data-pf="square" role="radio"><span class="frame f-11"></span><b data-i18n="pf.square"></b><small data-i18n="pf.squareSub"></small></button>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <h2 class="label" data-i18n="s3.scenes"></h2>
+            <div class="seg" id="scenesSeg">
+              <button data-v="auto" data-i18n="s3.auto"></button>
+              <button data-v="3">3</button><button data-v="5">5</button><button data-v="8">8</button><button data-v="10">10</button>
+            </div>
+          </div>
+          <div>
+            <h2 class="label" data-i18n="s3.length"></h2>
+            <div class="seg" id="lengthSeg">
+              <button data-v="4"></button><button data-v="6"></button><button data-v="8"></button>
+            </div>
+          </div>
+        </div>
+        <p class="hint" data-i18n="s3.scenesHint"></p>
+
+        <details class="more">
+          <summary data-i18n="s3.more"></summary>
+          <label class="check"><input type="checkbox" id="story"> <span data-i18n="s3.story"></span></label>
+          <div class="opt-grid">
+            <label><span data-i18n="s3.camera"></span>
+              <select id="camera">
+                <option value="auto" data-i18n="cam.auto"></option><option value="handheld" data-i18n="cam.handheld"></option>
+                <option value="smooth" data-i18n="cam.smooth"></option><option value="static" data-i18n="cam.static"></option>
+                <option value="drone" data-i18n="cam.drone"></option><option value="pov" data-i18n="cam.pov"></option>
+              </select>
+            </label>
+            <label><span data-i18n="s3.pace"></span>
+              <select id="pace">
+                <option value="balanced" data-i18n="pace.balanced"></option><option value="calm" data-i18n="pace.calm"></option>
+                <option value="viral" data-i18n="pace.viral"></option>
+              </select>
+            </label>
+            <label><span data-i18n="s3.audio"></span>
+              <select id="audio">
+                <option value="full" data-i18n="audio.full"></option><option value="sfx" data-i18n="audio.sfx"></option>
+                <option value="music" data-i18n="audio.music"></option><option value="silent" data-i18n="audio.silent"></option>
+              </select>
+            </label>
+            <label><span data-i18n="s3.dialog"></span>
+              <select id="dialogLang">
+                <option value="English">English</option><option value="Turkish">Türkçe</option>
+                <option value="Spanish">Español</option><option value="German">Deutsch</option>
+                <option value="French">Français</option><option value="Italian">Italiano</option>
+                <option value="Portuguese">Português</option><option value="Arabic">العربية</option>
+                <option value="Russian">Русский</option><option value="Japanese">日本語</option>
+              </select>
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="continuity" checked> <span data-i18n="s3.continuity"></span></label>
+          <label class="check"><input type="checkbox" id="negatives" checked> <span data-i18n="s3.negatives"></span></label>
+        </details>
+
+        <div class="step-nav">
+          <button class="back" data-go="2">← <span data-i18n="back"></span></button>
+          <button class="go" id="generateBtn"><span aria-hidden="true">🎬</span> <span data-i18n="s3.generate"></span></button>
+        </div>
+      </div>
+
+      <div class="status" id="status" role="status"></div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>2 · Write your scenario <span id="catBadge" class="badge"></span></h2>
-        <div class="btn-row">
-          <button class="chip" id="suggestBtn">💡 Suggest scenario</button>
-          <button class="chip" id="polishBtn">✨ Polish & add locations</button>
-          <button class="chip" id="randomBtn">🎲 Random idea</button>
-          <button class="chip" id="clearScenarioBtn">🧹 Clear</button>
-        </div>
+    <aside class="summary" aria-labelledby="sumTitle">
+      <div class="sum-head">
+        <h2 id="sumTitle" data-i18n="sum.title"></h2>
+        <span class="mode" id="modeBadge"></span>
       </div>
-
-      <div class="seg" id="structureSeg">
-        <button data-v="lines" class="on">📄 One line = one scene</button>
-        <button data-v="story">🎬 4-act story</button>
-      </div>
-
-      <textarea id="scenario" rows="7" placeholder="Example:
-A barista opens a tiny café at dawn, flipping the sign to OPEN
-The first customer, an old man, orders the same coffee he has for 40 years
-Rain starts; strangers crowd inside and start talking
-At closing time the barista finds a thank-you note on the counter"></textarea>
-      <div class="hint"><span id="lineCount">0 lines</span> · In <b>Auto</b> mode every line becomes one scene.</div>
-
-      <label class="lbl" for="dna">🧬 Character DNA &amp; visual identity anchor <span class="muted">(optional)</span></label>
-      <textarea id="dna" rows="3" placeholder="e.g. Mia, 28, short copper hair, freckles, green eyes, mustard knit sweater, brown apron, silver hoop earrings. Location: small corner café with teal tiles and warm Edison bulbs."></textarea>
-      <div class="hint">Locked into every prompt so face, outfit, colours and setting stay consistent across scenes.</div>
-
-      <div class="grid3">
-        <div>
-          <label class="lbl" for="sceneMode">⚙️ Scene count</label>
-          <select id="sceneMode">
-            <option value="auto">🤖 Auto (one per line)</option>
-            <option value="3">3 scenes</option>
-            <option value="5">5 scenes</option>
-            <option value="10">10 scenes</option>
-            <option value="20">20 scenes</option>
-          </select>
-        </div>
-        <div>
-          <label class="lbl" for="style">🎨 Visual style lock</label>
-          <select id="style"></select>
-        </div>
-        <div>
-          <label class="lbl" for="aspect">📐 Aspect ratio</label>
-          <select id="aspect">
-            <option value="9:16">9:16 vertical (Shorts / Reels / TikTok)</option>
-            <option value="16:9">16:9 widescreen</option>
-            <option value="1:1">1:1 square</option>
-          </select>
-        </div>
-      </div>
-
-      <details class="adv">
-        <summary>⚙️ Advanced video, audio &amp; model parameters</summary>
-        <div class="grid3">
-          <div>
-            <label class="lbl" for="duration">⏱️ Clip length</label>
-            <select id="duration">
-              <option value="8">8 seconds (Veo default)</option>
-              <option value="6">6 seconds</option>
-              <option value="4">4 seconds</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="camera">🎥 Camera language</label>
-            <select id="camera">
-              <option value="auto">Auto (varied per scene)</option>
-              <option value="handheld">Handheld documentary</option>
-              <option value="smooth">Smooth gimbal / dolly</option>
-              <option value="static">Locked-off tripod</option>
-              <option value="drone">Aerial / drone</option>
-              <option value="pov">First-person POV</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="pace">⚡ Pacing</label>
-            <select id="pace">
-              <option value="balanced">Balanced</option>
-              <option value="calm">Calm & slow</option>
-              <option value="viral">Fast viral hook</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="audio">🔊 Audio</label>
-            <select id="audio">
-              <option value="full">Ambient + SFX + dialogue</option>
-              <option value="sfx">Ambient + SFX, no dialogue</option>
-              <option value="music">Music only</option>
-              <option value="silent">Silent</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="dialogLang">🗣️ Dialogue language</label>
-            <select id="dialogLang">
-              <option>English</option><option>Turkish</option><option>Spanish</option>
-              <option>German</option><option>French</option><option>Arabic</option>
-              <option>Hebrew</option><option>Russian</option><option>Portuguese</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl" for="target">🎯 Target generator</label>
-            <select id="target">
-              <option value="veo">Gemini / Veo</option>
-              <option value="generic">Generic (Sora, Kling, Runway…)</option>
-            </select>
-          </div>
-        </div>
-        <label class="check"><input type="checkbox" id="continuity" checked> Continuity mode: each scene starts where the previous one ended</label>
-        <label class="check"><input type="checkbox" id="negatives" checked> Add a negative prompt (no text, no watermark, no distorted hands…)</label>
-      </details>
-
-      <button id="generateBtn" class="primary">🚀 Generate cinematic prompt cards</button>
-      <div id="status" class="status" role="status"></div>
-    </section>
-
-    <section class="panel" id="resultsPanel" hidden>
-      <div class="panel-head">
-        <h2>3 · Your prompts <span id="resultMeta" class="muted"></span></h2>
-        <div class="btn-row">
-          <button class="chip" id="copyAllBtn">📋 Copy all</button>
-          <button class="chip" id="dlTxtBtn">⬇️ .txt</button>
-          <button class="chip" id="dlJsonBtn">⬇️ .json</button>
-        </div>
-      </div>
-      <div id="results" class="cards"></div>
-    </section>
+      <dl id="summaryList"></dl>
+      <button class="go small" id="sumGenerate"><span aria-hidden="true">🎬</span> <span data-i18n="sum.go"></span></button>
+    </aside>
   </main>
 
-  <footer class="foot">
-    Paste each card into Gemini (Veo) or your favourite video generator, one scene at a time.
-  </footer>
+  <section class="results" id="results" hidden>
+    <div class="res-head">
+      <div>
+        <h2 data-i18n="res.title"></h2>
+        <p class="meta" id="resMeta"></p>
+      </div>
+      <div class="btn-row">
+        <button class="soft" id="copyAllBtn"><span aria-hidden="true">📋</span> <span data-i18n="res.copyAll"></span></button>
+        <button class="soft" id="dlTxtBtn">⬇ .txt</button>
+        <button class="soft" id="dlJsonBtn">⬇ .json</button>
+        <button class="soft" id="restartBtn"><span aria-hidden="true">↺</span> <span data-i18n="res.restart"></span></button>
+      </div>
+    </div>
+    <div class="howto">
+      <b data-i18n="res.howTitle"></b>
+      <ol>
+        <li data-i18n="res.how1"></li>
+        <li data-i18n="res.how2"></li>
+        <li data-i18n="res.how3"></li>
+      </ol>
+    </div>
+    <div class="board" id="board"></div>
+  </section>
 
+  <footer class="foot" data-i18n="foot"></footer>
 
-  <!-- History dialog -->
   <dialog id="historyDlg">
     <div class="dlg">
-      <h3>🕘 Recent generations</h3>
+      <h3 data-i18n="hist.title"></h3>
       <div id="historyList" class="history"></div>
       <div class="btn-row end">
-        <button class="ghost" id="clearHistoryBtn">Clear history</button>
-        <button class="primary small" id="closeHistoryBtn">Close</button>
+        <button class="soft" id="clearHistoryBtn" data-i18n="hist.clear"></button>
+        <button class="go small" id="closeHistoryBtn" data-i18n="hist.close"></button>
       </div>
     </div>
   </dialog>
 
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status"></div>
 
   <script src="data.js"></script>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

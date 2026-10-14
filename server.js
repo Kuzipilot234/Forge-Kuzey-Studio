@@ -14,7 +14,7 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;                       // …per 10 minute
 const MAX_BODY = 20000;                                      // characters
 
 const ROOT = __dirname;
-const PUBLIC_FILES = { "/": "index.html", "/index.html": "index.html", "/style.css": "style.css", "/data.js": "data.js", "/app.js": "app.js" };
+const PUBLIC_FILES = { "/": "index.html", "/index.html": "index.html", "/style.css": "style.css", "/data.js": "data.js", "/i18n.js": "i18n.js", "/app.js": "app.js" };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
 // ---- simple in-memory rate limiter ----

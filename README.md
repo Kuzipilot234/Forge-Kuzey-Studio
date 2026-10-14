@@ -5,7 +5,8 @@ Turn a scenario into consistent, cinematic, **scene-by-scene prompts for Gemini 
 ## Features
 
 - **26 categories**: Everyday Life, Cute Animals, Living Fruit People, ASMR, Magic Restoration, Infinite Zoom, FOOH City Illusion, Music Video and more. Each one steers the prompt style.
-- **One line = one scene**, or a **4-act story** structure.
+- **Guided 3 steps** (idea, look, format) with a live summary, in **English, Türkçe, Español and Deutsch**.
+- Write the idea in plain sentences, in any language, or tell it as a **4-act story**.
 - **Character DNA lock** keeps the face, outfit, colours and location identical in every scene.
 - **Visual style lock**: live action, 3D animation, anime, claymation, cyberpunk, 80s film and more.
 - **Scene count**: Auto (one per line) or a fixed 3 / 5 / 10 / 20.
@@ -55,5 +56,6 @@ Then open http://localhost:3000.
 | `index.html` | Page layout |
 | `style.css` | Styles (dark and light theme) |
 | `data.js` | Categories, visual styles, camera moves, idea seeds. Edit this file to add your own. |
-| `app.js` | Generator logic, AI calls, history |
+| `app.js` | Wizard, generator logic, AI calls, history |
+| `i18n.js` | All interface text in English, Turkish, Spanish and German. Copy a block to add a language. |
 | `render.yaml` | Render deployment settings |
