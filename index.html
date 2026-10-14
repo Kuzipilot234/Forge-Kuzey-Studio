@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SceneForge Prompt Studio</title>
+  <meta name="description" content="Turn a scenario into consistent, cinematic, scene-by-scene prompts for Gemini / Veo video generation.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=DM+Sans:opsz,wght@9..40,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo">🎬</span>
+      <div>
+        <h1>SceneForge<span class="rec" aria-hidden="true"></span></h1>
+        <p class="tag">Scenario → scene-by-scene AI video prompts for Gemini / Veo</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+      <button class="ghost" id="historyBtn">🕘 History</button>
+      <button class="ghost" id="settingsBtn">⚙️ API key</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>1 · Choose a category</h2>
+        <input id="catSearch" class="search" type="search" placeholder="Filter categories…">
+      </div>
+      <div id="categories" class="cat-grid" role="listbox" aria-label="Categories"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>2 · Write your scenario <span id="catBadge" class="badge"></span></h2>
+        <div class="btn-row">
+          <button class="chip" id="suggestBtn">💡 Suggest scenario</button>
+          <button class="chip" id="polishBtn">✨ Polish & add locations</button>
+          <button class="chip" id="randomBtn">🎲 Random idea</button>
+          <button class="chip" id="clearScenarioBtn">🧹 Clear</button>
+        </div>
+      </div>
+
+      <div class="seg" id="structureSeg">
+        <button data-v="lines" class="on">📄 One line = one scene</button>
+        <button data-v="story">🎬 4-act story</button>
+      </div>
+
+      <textarea id="scenario" rows="7" placeholder="Example:
+A barista opens a tiny café at dawn, flipping the sign to OPEN
+The first customer, an old man, orders the same coffee he has for 40 years
+Rain starts; strangers crowd inside and start talking
+At closing time the barista finds a thank-you note on the counter"></textarea>
+      <div class="hint"><span id="lineCount">0 lines</span> · In <b>Auto</b> mode every line becomes one scene.</div>
+
+      <label class="lbl" for="dna">🧬 Character DNA &amp; visual identity anchor <span class="muted">(optional)</span></label>
+      <textarea id="dna" rows="3" placeholder="e.g. Mia, 28, short copper hair, freckles, green eyes, mustard knit sweater, brown apron, silver hoop earrings. Location: small corner café with teal tiles and warm Edison bulbs."></textarea>
+      <div class="hint">Locked into every prompt so face, outfit, colours and setting stay consistent across scenes.</div>
+
+      <div class="grid3">
+        <div>
+          <label class="lbl" for="sceneMode">⚙️ Scene count</label>
+          <select id="sceneMode">
+            <option value="auto">🤖 Auto (one per line)</option>
+            <option value="3">3 scenes</option>
+            <option value="5">5 scenes</option>
+            <option value="10">10 scenes</option>
+            <option value="20">20 scenes</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" for="style">🎨 Visual style lock</label>
+          <select id="style"></select>
+        </div>
+        <div>
+          <label class="lbl" for="aspect">📐 Aspect ratio</label>
+          <select id="aspect">
+            <option value="9:16">9:16 vertical (Shorts / Reels / TikTok)</option>
+            <option value="16:9">16:9 widescreen</option>
+            <option value="1:1">1:1 square</option>
+          </select>
+        </div>
+      </div>
+
+      <details class="adv">
+        <summary>⚙️ Advanced video, audio &amp; model parameters</summary>
+        <div class="grid3">
+          <div>
+            <label class="lbl" for="duration">⏱️ Clip length</label>
+            <select id="duration">
+              <option value="8">8 seconds (Veo default)</option>
+              <option value="6">6 seconds</option>
+              <option value="4">4 seconds</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl" for="camera">🎥 Camera language</label>
+            <select id="camera">
+              <option value="auto">Auto (varied per scene)</option>
+              <option value="handheld">Handheld documentary</option>
+              <option value="smooth">Smooth gimbal / dolly</option>
+              <option value="static">Locked-off tripod</option>
+              <option value="drone">Aerial / drone</option>
+              <option value="pov">First-person POV</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl" for="pace">⚡ Pacing</label>
+            <select id="pace">
+              <option value="balanced">Balanced</option>
+              <option value="calm">Calm & slow</option>
+              <option value="viral">Fast viral hook</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl" for="audio">🔊 Audio</label>
+            <select id="audio">
+              <option value="full">Ambient + SFX + dialogue</option>
+              <option value="sfx">Ambient + SFX, no dialogue</option>
+              <option value="music">Music only</option>
+              <option value="silent">Silent</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl" for="dialogLang">🗣️ Dialogue language</label>
+            <select id="dialogLang">
+              <option>English</option><option>Turkish</option><option>Spanish</option>
+              <option>German</option><option>French</option><option>Arabic</option>
+              <option>Hebrew</option><option>Russian</option><option>Portuguese</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl" for="target">🎯 Target generator</label>
+            <select id="target">
+              <option value="veo">Gemini / Veo</option>
+              <option value="generic">Generic (Sora, Kling, Runway…)</option>
+            </select>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="continuity" checked> Continuity mode: each scene starts where the previous one ended</label>
+        <label class="check"><input type="checkbox" id="negatives" checked> Add a negative prompt (no text, no watermark, no distorted hands…)</label>
+      </details>
+
+      <button id="generateBtn" class="primary">🚀 Generate cinematic prompt cards</button>
+      <div id="status" class="status" role="status"></div>
+    </section>
+
+    <section class="panel" id="resultsPanel" hidden>
+      <div class="panel-head">
+        <h2>3 · Your prompts <span id="resultMeta" class="muted"></span></h2>
+        <div class="btn-row">
+          <button class="chip" id="copyAllBtn">📋 Copy all</button>
+          <button class="chip" id="dlTxtBtn">⬇️ .txt</button>
+          <button class="chip" id="dlJsonBtn">⬇️ .json</button>
+        </div>
+      </div>
+      <div id="results" class="cards"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Paste each card into Gemini (Veo) one by one. Your API key stays in your browser and is sent only to Google.
+  </footer>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsDlg">
+    <form method="dialog" class="dlg">
+      <h3>⚙️ Gemini API settings</h3>
+      <p class="muted">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. It is saved only in this browser. Without a key, SceneForge uses its built-in template engine.</p>
+      <label class="lbl" for="apiKey">API key</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="AIza…">
+      <label class="lbl" for="modelName">Model</label>
+      <input id="modelName" list="modelList" placeholder="gemini-2.5-flash">
+      <datalist id="modelList">
+        <option value="gemini-2.5-flash"></option>
+        <option value="gemini-2.5-pro"></option>
+        <option value="gemini-2.5-flash-lite"></option>
+      </datalist>
+      <div class="btn-row end">
+        <button value="clear" class="ghost" id="clearKeyBtn">Remove key</button>
+        <button value="save" class="primary small" id="saveKeyBtn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- History dialog -->
+  <dialog id="historyDlg">
+    <div class="dlg">
+      <h3>🕘 Recent generations</h3>
+      <div id="historyList" class="history"></div>
+      <div class="btn-row end">
+        <button class="ghost" id="clearHistoryBtn">Clear history</button>
+        <button class="primary small" id="closeHistoryBtn">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
