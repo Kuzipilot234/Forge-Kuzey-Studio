@@ -83,8 +83,9 @@ async function callGemini(system, user, json) {
     }
     console.error(`Gemini error with ${model}:`, r.status, data?.error?.message);
     lastError = new AIError(r.status, `[${model}] ${data?.error?.message || ""}`);
-    // Only an unknown model name is worth retrying with another name.
-    if (r.status !== 404) break;
+    // Unknown model (404), out of free quota for this model (429) or overloaded (500/503):
+    // try the next model. Anything else (e.g. a bad key) won't be fixed by another model.
+    if (![404, 429, 500, 503].includes(r.status)) break;
   }
   throw lastError;
 }
