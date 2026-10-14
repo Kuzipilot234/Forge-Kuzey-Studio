@@ -1,5 +1,5 @@
-// Forge Kuzey Studio server: serves the site and forwards AI requests to Groq.
-// The Groq key lives only in the GROQ_API_KEY environment variable, never in the browser.
+// Forge Kuzey Studio server: serves the site and forwards AI requests to Google Gemini
+// (or Groq, if only a Groq key is set). Keys live only in environment variables, never in the browser.
 // No dependencies; needs Node 18+ (built-in fetch).
 "use strict";
 const http = require("http");
@@ -7,8 +7,14 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || "").trim();
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || "").trim();
+// "gemini-flash-latest" always points at Google's newest Flash model. If Google rejects a name,
+// the next one in the list is tried.
+const GEMINI_MODELS = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
+  .filter((m, i, a) => m && a.indexOf(m) === i);
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const PROVIDER = GEMINI_API_KEY ? "gemini" : GROQ_API_KEY ? "groq" : "";
 const RATE_LIMIT = +(process.env.RATE_LIMIT || 30);          // requests per visitor…
 const RATE_WINDOW_MS = 10 * 60 * 1000;                       // …per 10 minutes
 const MAX_BODY = 20000;                                      // characters
@@ -16,6 +22,8 @@ const MAX_BODY = 20000;                                      // characters
 const ROOT = __dirname;
 const PUBLIC_FILES = { "/": "index.html", "/index.html": "index.html", "/style.css": "style.css", "/data.js": "data.js", "/i18n.js": "i18n.js", "/app.js": "app.js" };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+
+let geminiModel = GEMINI_MODELS[0]; // remembers the first model name that worked
 
 // ---- simple in-memory rate limiter ----
 const hits = new Map();
@@ -50,8 +58,57 @@ function readBody(req) {
   });
 }
 
+class AIError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+async function callGemini(system, user, json) {
+  const order = [geminiModel, ...GEMINI_MODELS.filter((m) => m !== geminiModel)];
+  let lastError;
+  for (const model of order) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: { temperature: 0.9, maxOutputTokens: 8192, ...(json ? { responseMimeType: "application/json" } : {}) }
+      })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) {
+      geminiModel = model;
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      return parts.filter((p) => !p.thought).map((p) => p.text || "").join("");
+    }
+    console.error(`Gemini error with ${model}:`, r.status, data?.error?.message);
+    lastError = new AIError(r.status, data?.error?.message);
+    // Only an unknown model name is worth retrying with another name.
+    if (r.status !== 404) break;
+  }
+  throw lastError;
+}
+
+async function callGroq(system, user, json) {
+  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
+    body: JSON.stringify({
+      model: GROQ_MODEL, temperature: 0.9, max_tokens: 8000,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      ...(json ? { response_format: { type: "json_object" } } : {})
+    })
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    console.error("Groq error", r.status, data?.error?.message);
+    throw new AIError(r.status, data?.error?.message);
+  }
+  return data?.choices?.[0]?.message?.content || "";
+}
+
 async function handleGenerate(req, res) {
-  if (!GROQ_API_KEY) return send(res, 503, { error: "The server has no GROQ_API_KEY set" });
+  if (!PROVIDER) return send(res, 503, { error: "The server has no AI key set" });
   const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
   if (rateLimited(ip)) return send(res, 429, { error: "Too many requests. Please wait a few minutes and try again" });
 
@@ -63,32 +120,20 @@ async function handleGenerate(req, res) {
   if (!user) return send(res, 400, { error: "Empty request" });
 
   try {
-    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.9,
-        max_tokens: 8000,
-        messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        ...(input.json ? { response_format: { type: "json_object" } } : {})
-      })
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      console.error("Groq error", r.status, data?.error?.message);
-      return send(res, 502, { error: r.status === 429 ? "The AI is busy right now. Try again in a minute" : "The AI service returned an error" });
-    }
-    send(res, 200, { text: data?.choices?.[0]?.message?.content || "" });
+    const text = PROVIDER === "gemini" ? await callGemini(system, user, input.json) : await callGroq(system, user, input.json);
+    send(res, 200, { text });
   } catch (err) {
-    console.error(err);
-    send(res, 502, { error: "Couldn't reach the AI service" });
+    if (!(err instanceof AIError)) console.error(err);
+    const status = err instanceof AIError ? err.status : 0;
+    send(res, 502, { error: status === 429 ? "The AI is busy right now. Try again in a minute" : status ? "The AI service returned an error" : "Couldn't reach the AI service" });
   }
 }
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
-  if (url.pathname === "/api/health") return send(res, 200, { ai: Boolean(GROQ_API_KEY), model: GROQ_MODEL });
+  if (url.pathname === "/api/health") {
+    return send(res, 200, { ai: Boolean(PROVIDER), provider: PROVIDER, model: PROVIDER === "gemini" ? geminiModel : PROVIDER === "groq" ? GROQ_MODEL : "" });
+  }
   if (url.pathname === "/api/generate") {
     if (req.method !== "POST") return send(res, 405, { error: "Use POST" });
     return handleGenerate(req, res);
@@ -100,4 +145,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(file)], "Cache-Control": "no-cache" });
     res.end(buf);
   });
-}).listen(PORT, () => console.log(`Forge Kuzey Studio running on port ${PORT} (AI ${GROQ_API_KEY ? "on" : "off"}, model ${GROQ_MODEL})`));
+}).listen(PORT, () => console.log(`Forge Kuzey Studio running on port ${PORT} (AI: ${PROVIDER || "off"}${PROVIDER === "gemini" ? ", model " + geminiModel : ""})`));

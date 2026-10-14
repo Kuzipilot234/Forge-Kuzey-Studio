@@ -14,26 +14,27 @@ Turn a scenario into consistent, cinematic, **scene-by-scene prompts for Gemini 
 - **Scenario helpers**: 💡 Suggest, ✨ Polish & add locations, 🎲 Random idea.
 - **Output**: copy one card or all of them, download `.txt` / `.json`, and reopen recent runs from history.
 - **Two engines**:
-  - 🤖 **AI mode**: [Groq](https://console.groq.com) writes the prompts, using one shared key kept on the server.
+  - 🤖 **AI mode**: [Google Gemini](https://aistudio.google.com/apikey) writes the prompts, using one shared key kept on the server.
   - 🧩 **Template mode**: used automatically when the AI server isn't available.
 
 ## How the API key works
 
-The Groq key is **never** in this repo or in the browser. It is stored in the `GROQ_API_KEY` environment variable on the server. `server.js` serves the site and forwards AI requests to Groq. Each visitor is limited to 30 AI requests per 10 minutes so nobody can use up the quota.
+The API key is **never** in this repo or in the browser. It is stored in the `GEMINI_API_KEY` environment variable on the server. `server.js` serves the site and forwards AI requests to Gemini. Each visitor is limited to 30 AI requests per 10 minutes so nobody can use up the quota.
 
-**To change the key:** Render dashboard → your service → **Environment** → edit `GROQ_API_KEY` → **Save changes**. Render restarts the site with the new key, and nothing in the code changes.
+**To change the key:** Render dashboard → your service → **Environment** → edit `GEMINI_API_KEY` → **Save changes**. Render restarts the site with the new key, and nothing in the code changes.
 
 Optional environment variables:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Any Groq chat model |
+| `GEMINI_MODEL` | `gemini-flash-latest` | Any Gemini model name. If Google rejects it, a few known model names are tried in turn. |
+| `GROQ_API_KEY` | (none) | Use Groq instead of Gemini. Only used when `GEMINI_API_KEY` is not set. |
 | `RATE_LIMIT` | `30` | AI requests per visitor per 10 minutes |
 
 ## Deploy on Render
 
-1. In the [Render dashboard](https://dashboard.render.com), click **New → Blueprint**, pick this repo, enter your `GROQ_API_KEY` when asked, then click **Apply**.
-   You can also use **New → Web Service**: pick this repo, set runtime *Node*, build command `npm install`, start command `node server.js`, plan *Free*, and add the `GROQ_API_KEY` environment variable.
+1. In the [Render dashboard](https://dashboard.render.com), click **New → Blueprint**, pick this repo, enter your `GEMINI_API_KEY` when asked, then click **Apply**.
+   You can also use **New → Web Service**: pick this repo, set runtime *Node*, build command `npm install`, start command `node server.js`, plan *Free*, and add the `GEMINI_API_KEY` environment variable.
 2. The site is served at `https://forge-kuzey-studio.onrender.com` (or a similar name) and redeploys on every push to `main`.
 
 On Render's free plan the server sleeps after about 15 minutes without visitors. The next visit then takes up to a minute to load.
@@ -43,7 +44,7 @@ On Render's free plan the server sleeps after about 15 minutes without visitors.
 You need Node.js 18 or newer.
 
 ```bash
-GROQ_API_KEY=your_key node server.js
+GEMINI_API_KEY=your_key node server.js
 ```
 
 Then open http://localhost:3000.
@@ -52,7 +53,7 @@ Then open http://localhost:3000.
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Small Node server: serves the site and forwards AI requests to Groq |
+| `server.js` | Small Node server: serves the site and forwards AI requests to Gemini |
 | `index.html` | Page layout |
 | `style.css` | Styles (dark and light theme) |
 | `data.js` | Categories, visual styles, camera moves, idea seeds. Edit this file to add your own. |

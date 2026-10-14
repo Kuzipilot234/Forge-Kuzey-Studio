@@ -1,5 +1,5 @@
 # Render Blueprint: runs Forge Kuzey Studio as a free Node web service.
-# Set GROQ_API_KEY in the Render dashboard (Environment tab). It is never stored in this repo.
+# Set GEMINI_API_KEY in the Render dashboard (Environment tab). It is never stored in this repo.
 services:
   - type: web
     name: forge-kuzey-studio
@@ -9,7 +9,5 @@ services:
     startCommand: node server.js
     healthCheckPath: /api/health
     envVars:
-      - key: GROQ_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
-      - key: GROQ_MODEL
-        value: llama-3.3-70b-versatile
