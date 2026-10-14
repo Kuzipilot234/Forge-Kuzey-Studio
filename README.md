@@ -1,4 +1,4 @@
-# 🎬 SceneForge Prompt Studio
+# 🎬 Forge Kuzey Studio — SceneForge Prompt Studio
 
 Turn a scenario into consistent, cinematic, **scene-by-scene prompts for Gemini / Veo** (or any text-to-video model).
 
