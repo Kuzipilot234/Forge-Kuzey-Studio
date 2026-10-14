@@ -12,7 +12,9 @@
   const state = {
     category: LS.get("category", "daily"),
     structure: "lines",
-    lastResult: null
+    lastResult: null,
+    ai: false,
+    model: ""
   };
 
   const FIELDS = ["scenario", "dna", "sceneMode", "style", "aspect", "duration", "camera", "pace", "audio", "dialogLang", "target"];
@@ -117,20 +119,6 @@
       LS.set("theme", cur);
     });
 
-    // settings
-    $("settingsBtn").addEventListener("click", () => {
-      $("apiKey").value = LS.get("apiKey", "");
-      $("modelName").value = LS.get("model", "gemini-2.5-flash");
-      $("settingsDlg").showModal();
-    });
-    $("saveKeyBtn").addEventListener("click", () => {
-      LS.set("apiKey", $("apiKey").value.trim());
-      LS.set("model", $("modelName").value.trim() || "gemini-2.5-flash");
-      toast("Settings saved");
-      updateModeHint();
-    });
-    $("clearKeyBtn").addEventListener("click", () => { LS.del("apiKey"); toast("Key removed"); updateModeHint(); });
-
     // history
     $("historyBtn").addEventListener("click", () => { renderHistory(); $("historyDlg").showModal(); });
     $("closeHistoryBtn").addEventListener("click", () => $("historyDlg").close());
@@ -152,6 +140,7 @@
       showResults({ created: new Date().toISOString(), engine: "template", example: true, ...exampleResult() }, false);
       setStatus("👀 This is an example. Edit the scenario and press Generate to make your own.");
     }
+    checkAI();
   }
 
   const EXAMPLE = {
@@ -181,7 +170,7 @@
     LS.set("form", o);
   }
   function updateModeHint() {
-    setStatus(LS.get("apiKey", "") ? "🤖 Gemini AI mode is on." : "🧩 Template mode (add a Gemini API key in ⚙️ for AI-written prompts).");
+    setStatus(state.ai ? "🤖 AI mode is on." : "🧩 Template mode: the AI server isn't available, so prompts come from built-in templates.");
   }
 
   // ---------- settings snapshot ----------
@@ -208,18 +197,17 @@
 
     const btn = $("generateBtn");
     btn.disabled = true;
-    const key = LS.get("apiKey", "");
     try {
       let scenes;
-      if (key) {
-        setStatus(`Gemini is writing ${s.count} scene${s.count > 1 ? "s" : ""}…`, false, true);
-        scenes = await aiScenes(s, key);
+      if (state.ai) {
+        setStatus(`AI is writing ${s.count} scene${s.count > 1 ? "s" : ""}…`, false, true);
+        scenes = await aiScenes(s);
       } else {
         scenes = templateScenes(s);
       }
       const result = {
         created: new Date().toISOString(),
-        engine: key ? "gemini:" + LS.get("model", "gemini-2.5-flash") : "template",
+        engine: state.ai ? "AI · " + state.model : "template",
         category: s.category.name, style: s.style.name, aspect: s.aspect, duration: s.duration,
         dna: s.dna, scenario: s.lines.join("\n"), scenes
       };
@@ -301,32 +289,38 @@ Respond with JSON only, shape:
 {"scenes":[{"title":"short scene title","prompt":"full prompt","camera":"camera move","lighting":"lighting","negative":"${s.negatives ? "negative prompt" : ""}"}]}`;
   }
 
-  async function callGemini(key, system, user, json) {
-    const model = LS.get("model", "gemini-2.5-flash");
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  // The site's own server holds the Groq key and forwards the request.
+  async function callAI(system, user, json) {
+    const res = await fetch("api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { temperature: 0.9, ...(json ? { responseMimeType: "application/json" } : {}) }
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system, user, json })
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error?.message || `Gemini error ${res.status}`);
-    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-    if (!text) throw new Error("Gemini returned an empty answer (it may have been blocked by safety filters)");
-    return text;
+    if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+    if (!data.text) throw new Error("The AI returned an empty answer");
+    return data.text;
   }
 
-  async function aiScenes(s, key) {
+  async function checkAI() {
+    try {
+      const res = await fetch("api/health", { cache: "no-store" });
+      const data = res.ok ? await res.json() : {};
+      state.ai = Boolean(data.ai);
+      state.model = data.model || "";
+    } catch { state.ai = false; }
+    if (!state.lastResult || state.lastResult.example) updateModeHint();
+  }
+
+  async function aiScenes(s) {
     const user = `Scenario lines:\n${s.lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}`;
-    const raw = await callGemini(key, systemPrompt(s), user, true);
+    const raw = await callAI(systemPrompt(s), user, true);
     let parsed;
     try { parsed = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")); }
-    catch { throw new Error("Couldn't read Gemini's answer"); }
-    const scenes = (parsed.scenes || parsed).filter((x) => x && x.prompt);
-    if (!scenes.length) throw new Error("Gemini returned no scenes");
+    catch { throw new Error("Couldn't read the AI's answer"); }
+    const list = Array.isArray(parsed) ? parsed : parsed.scenes;
+    const scenes = (Array.isArray(list) ? list : []).filter((x) => x && x.prompt);
+    if (!scenes.length) throw new Error("The AI returned no scenes");
     return scenes.map((x) => ({
       title: String(x.title || "Scene"), prompt: String(x.prompt),
       camera: String(x.camera || ""), lighting: String(x.lighting || ""),
@@ -337,12 +331,11 @@ Respond with JSON only, shape:
   // ---------- scenario helpers ----------
   async function helper(kind) {
     const s = settings();
-    const key = LS.get("apiKey", "");
     const btn = $(kind + "Btn");
 
     if (kind === "polish" && !s.lines.length) { setStatus("Nothing to polish yet — write a few lines first.", true); return; }
 
-    if (!key) {
+    if (!state.ai) {
       if (kind === "polish") {
         const places = ["in a sunlit kitchen", "on a quiet city street at dusk", "in a cozy living room", "on a windy hilltop", "in a busy market", "by a calm lakeshore"];
         $("scenario").value = s.lines.map((l, i) => /\b(in|at|on|by|inside|under)\b/i.test(l) ? cap(l) : `${cap(l.replace(/[.]+$/, ""))} ${pick(places, i)}`).join("\n");
@@ -357,7 +350,7 @@ Respond with JSON only, shape:
     }
 
     btn.disabled = true;
-    setStatus("Gemini is thinking…", false, true);
+    setStatus("AI is thinking…", false, true);
     try {
       const randomCat = rand(D.categories);
       const prompts = {
@@ -365,7 +358,7 @@ Respond with JSON only, shape:
         random: `Invent a surprising, viral-worthy short video scenario in the category "${randomCat.name}" (${randomCat.brief}). Give 4-6 lines, one scene per line, each one vivid sentence. Plain text only, no numbering, no title.`,
         polish: `Improve these scenario lines for AI video generation. Keep the same number of lines and order. Make each line one vivid sentence with a clear action, a specific location and a visual detail. Fix grammar. Plain text only, no numbering.\n\n${s.lines.join("\n")}`
       };
-      const text = await callGemini(key, "You help writers create short-form video scenarios. Output only the requested lines.", prompts[kind], false);
+      const text = await callAI("You help writers create short-form video scenarios. Output only the requested lines.", prompts[kind], false);
       $("scenario").value = text.split("\n").map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(Boolean).join("\n");
       updateLineCount(); saveForm();
       updateModeHint();

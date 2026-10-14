@@ -1,12 +1,15 @@
-# Render Blueprint: deploys SceneForge as a free static site.
+# Render Blueprint: runs SceneForge as a free Node web service.
+# Set GROQ_API_KEY in the Render dashboard (Environment tab). It is never stored in this repo.
 services:
   - type: web
     name: forge-kuzey-studio
-    runtime: static
-    buildCommand: ""
-    staticPublishPath: .
-    pullRequestPreviewsEnabled: false
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: SAMEORIGIN
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile

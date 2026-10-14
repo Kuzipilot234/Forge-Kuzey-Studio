@@ -23,7 +23,6 @@
     <div class="top-actions">
       <button class="ghost" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌓</button>
       <button class="ghost" id="historyBtn">🕘 History</button>
-      <button class="ghost" id="settingsBtn">⚙️ API key</button>
     </div>
   </header>
 
@@ -165,29 +164,9 @@ At closing time the barista finds a thank-you note on the counter"></textarea>
   </main>
 
   <footer class="foot">
-    Paste each card into Gemini (Veo) one by one. Your API key stays in your browser and is sent only to Google.
+    Paste each card into Gemini (Veo) or your favourite video generator, one scene at a time.
   </footer>
 
-  <!-- Settings dialog -->
-  <dialog id="settingsDlg">
-    <form method="dialog" class="dlg">
-      <h3>⚙️ Gemini API settings</h3>
-      <p class="muted">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. It is saved only in this browser. Without a key, SceneForge uses its built-in template engine.</p>
-      <label class="lbl" for="apiKey">API key</label>
-      <input id="apiKey" type="password" autocomplete="off" placeholder="AIza…">
-      <label class="lbl" for="modelName">Model</label>
-      <input id="modelName" list="modelList" placeholder="gemini-2.5-flash">
-      <datalist id="modelList">
-        <option value="gemini-2.5-flash"></option>
-        <option value="gemini-2.5-pro"></option>
-        <option value="gemini-2.5-flash-lite"></option>
-      </datalist>
-      <div class="btn-row end">
-        <button value="clear" class="ghost" id="clearKeyBtn">Remove key</button>
-        <button value="save" class="primary small" id="saveKeyBtn">Save</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- History dialog -->
   <dialog id="historyDlg">
