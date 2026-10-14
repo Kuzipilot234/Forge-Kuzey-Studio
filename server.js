@@ -82,7 +82,7 @@ async function callGemini(system, user, json) {
       return parts.filter((p) => !p.thought).map((p) => p.text || "").join("");
     }
     console.error(`Gemini error with ${model}:`, r.status, data?.error?.message);
-    lastError = new AIError(r.status, data?.error?.message);
+    lastError = new AIError(r.status, `[${model}] ${data?.error?.message || ""}`);
     // Only an unknown model name is worth retrying with another name.
     if (r.status !== 404) break;
   }
@@ -125,7 +125,9 @@ async function handleGenerate(req, res) {
   } catch (err) {
     if (!(err instanceof AIError)) console.error(err);
     const status = err instanceof AIError ? err.status : 0;
-    send(res, 502, { error: status === 429 ? "The AI is busy right now. Try again in a minute" : status ? "The AI service returned an error" : "Couldn't reach the AI service" });
+    // "detail" carries the provider's own reason (never the key) so problems can be diagnosed.
+    const detail = `${status || "network"} ${String(err.message || "").replaceAll(GEMINI_API_KEY || "\u0000", "***").replaceAll(GROQ_API_KEY || "\u0000", "***")}`.slice(0, 300);
+    send(res, 502, { error: status === 429 ? "The AI is busy right now. Try again in a minute" : status ? "The AI service returned an error" : "Couldn't reach the AI service", detail });
   }
 }
 
