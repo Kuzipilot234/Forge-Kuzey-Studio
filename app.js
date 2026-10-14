@@ -1,4 +1,4 @@
-// SceneForge — scenario to scene-by-scene video prompts.
+// Forge Kuzey Studio — scenario to scene-by-scene video prompts.
 (() => {
   "use strict";
   const D = window.SF_DATA;
@@ -104,8 +104,8 @@
     $("clearScenarioBtn").addEventListener("click", () => { $("scenario").value = ""; updateLineCount(); saveForm(); });
 
     $("copyAllBtn").addEventListener("click", () => state.lastResult && copy(asText(state.lastResult)));
-    $("dlTxtBtn").addEventListener("click", () => state.lastResult && download("sceneforge-prompts.txt", asText(state.lastResult), "text/plain"));
-    $("dlJsonBtn").addEventListener("click", () => state.lastResult && download("sceneforge-prompts.json", JSON.stringify(state.lastResult, null, 2), "application/json"));
+    $("dlTxtBtn").addEventListener("click", () => state.lastResult && download("forge-kuzey-prompts.txt", asText(state.lastResult), "text/plain"));
+    $("dlJsonBtn").addEventListener("click", () => state.lastResult && download("forge-kuzey-prompts.json", JSON.stringify(state.lastResult, null, 2), "application/json"));
     $("results").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]");
       if (b && state.lastResult) copy(cardText(state.lastResult.scenes[+b.dataset.copy]));
@@ -384,7 +384,7 @@ Respond with JSON only, shape:
     return sc.prompt + (sc.negative ? `\n\nNegative prompt: ${sc.negative}` : "");
   }
   function asText(r) {
-    return `SceneForge — ${r.category} · ${r.style} · ${r.aspect} · ${r.duration}s\n${"=".repeat(60)}\n\n` +
+    return `Forge Kuzey Studio — ${r.category} · ${r.style} · ${r.aspect} · ${r.duration}s\n${"=".repeat(60)}\n\n` +
       r.scenes.map((sc, i) => `SCENE ${i + 1}: ${sc.title}\n\n${cardText(sc)}`).join(`\n\n${"-".repeat(60)}\n\n`);
   }
   function showResults(r, scroll = true) {

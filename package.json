@@ -1,7 +1,7 @@
 {
   "name": "forge-kuzey-studio",
   "version": "1.0.0",
-  "description": "SceneForge: scenario to scene-by-scene AI video prompts, powered by Groq",
+  "description": "Forge Kuzey Studio: scenario to scene-by-scene AI video prompts, powered by Groq",
   "main": "server.js",
   "private": true,
   "scripts": {

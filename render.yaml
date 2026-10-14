@@ -1,4 +1,4 @@
-# Render Blueprint: runs SceneForge as a free Node web service.
+# Render Blueprint: runs Forge Kuzey Studio as a free Node web service.
 # Set GROQ_API_KEY in the Render dashboard (Environment tab). It is never stored in this repo.
 services:
   - type: web

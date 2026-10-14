@@ -1,4 +1,4 @@
-// Categories, visual styles and idea seeds used by SceneForge.
+// Categories, visual styles and idea seeds used by Forge Kuzey Studio.
 // Each category has a "brief" that steers the AI (and the template engine).
 window.SF_DATA = {
   categories: [

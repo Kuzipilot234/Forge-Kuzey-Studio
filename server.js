@@ -1,4 +1,4 @@
-// SceneForge server: serves the site and forwards AI requests to Groq.
+// Forge Kuzey Studio server: serves the site and forwards AI requests to Groq.
 // The Groq key lives only in the GROQ_API_KEY environment variable, never in the browser.
 // No dependencies; needs Node 18+ (built-in fetch).
 "use strict";
@@ -100,4 +100,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(file)], "Cache-Control": "no-cache" });
     res.end(buf);
   });
-}).listen(PORT, () => console.log(`SceneForge running on port ${PORT} (AI ${GROQ_API_KEY ? "on" : "off"}, model ${GROQ_MODEL})`));
+}).listen(PORT, () => console.log(`Forge Kuzey Studio running on port ${PORT} (AI ${GROQ_API_KEY ? "on" : "off"}, model ${GROQ_MODEL})`));
