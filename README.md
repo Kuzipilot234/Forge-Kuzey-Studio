@@ -43,3 +43,11 @@ Then open http://localhost:8000.
 | `style.css` | Styles (dark and light theme) |
 | `data.js` | Categories, visual styles, camera moves, idea seeds. Edit this file to add your own. |
 | `app.js` | Generator logic, Gemini API calls, history |
+
+## Deploy on Render
+
+This repo includes a `render.yaml` Blueprint.
+
+1. In the [Render dashboard](https://dashboard.render.com), click **New → Blueprint** and pick this repo, then **Apply**.
+   You can also use **New → Static Site**: pick this repo, leave the build command empty, and set the publish directory to `.`.
+2. Render serves the site at `https://forge-kuzey-studio.onrender.com` (or a similar name) and redeploys on every push to `main`.

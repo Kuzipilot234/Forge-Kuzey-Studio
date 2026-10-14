@@ -1,0 +1,12 @@
+# Render Blueprint: deploys SceneForge as a free static site.
+services:
+  - type: web
+    name: forge-kuzey-studio
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
