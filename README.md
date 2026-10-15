@@ -32,6 +32,21 @@ Optional environment variables:
 | `GROQ_MODEL` | (auto) | Force a specific Groq model |
 | `RATE_LIMIT` | `30` | AI requests per visitor per 10 minutes |
 
+## Accounts (optional)
+
+When `FIREBASE_CONFIG` is set, visitors can sign up (email + password with a verification link, or Google) and their storyboards are saved to their account. The AI then only works for signed-in users with a verified email, up to `AI_DAILY_LIMIT` requests per person per day (default 30). Without it, the site works as before.
+
+1. Create a project at [Firebase console](https://console.firebase.google.com) and add a **Web app**. Copy its `firebaseConfig` block.
+2. **Authentication → Sign-in method:** enable **Email/Password** and **Google**.
+3. **Authentication → Settings → Authorized domains:** add your site address (e.g. `forge-kuzey-studio.onrender.com`).
+4. **Firestore Database → Create database**, then paste `firestore.rules` into **Rules** and publish.
+5. On Render, add `FIREBASE_CONFIG` and paste the whole `firebaseConfig` block as the value.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `FIREBASE_CONFIG` | (none) | The Firebase web config. Turns accounts on. |
+| `AI_DAILY_LIMIT` | `30` | AI requests per signed-in user per day |
+
 ## Deploy on Render
 
 1. In the [Render dashboard](https://dashboard.render.com), click **New → Blueprint**, pick this repo, enter your `GEMINI_API_KEY` when asked, then click **Apply**.
@@ -61,3 +76,5 @@ Then open http://localhost:3000.
 | `app.js` | Wizard, generator logic, AI calls, history |
 | `i18n.js` | All interface text in English, Turkish, Spanish and German. Copy a block to add a language. |
 | `render.yaml` | Render deployment settings |
+| `privacy.html` | Privacy policy (English and Turkish) |
+| `firestore.rules` | Security rules for saved storyboards (paste into Firebase) |
