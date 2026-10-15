@@ -1,7 +1,7 @@
 rules_version = '2';
 // Firestore security rules for Forge Kuzey Studio.
 // Paste this into Firebase console → Firestore Database → Rules → Publish.
-// Each signed-in user with a verified email can only read, add and delete their own storyboards.
+// Each signed-in user with a verified email can only read, add and delete their own data.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/storyboards/{storyboardId} {
@@ -11,6 +11,14 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.resource.data.scenes is list
         && request.resource.data.scenes.size() <= 12;
+    }
+    match /users/{uid}/characters/{characterId} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60;
     }
   }
 }

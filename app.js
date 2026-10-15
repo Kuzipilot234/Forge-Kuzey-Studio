@@ -86,7 +86,7 @@
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
     document.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); el.setAttribute("aria-label", el.title); });
-    renderExamples(); renderTypes(); renderStyles(); renderTools(); renderControls(); renderGuide(); renderMode(); renderSummary(); renderCount();
+    renderExamples(); renderTypes(); renderStyles(); renderTools(); renderControls(); renderGuide(); renderChars(); renderMode(); renderSummary(); renderCount();
     if (state.lastResult) renderResults(state.lastResult);
   }
 
@@ -281,8 +281,97 @@ ${s.dna ? `- Character and setting (copy these details word for word into EVERY 
 - No on-screen text or subtitles. Keep everything safe for all audiences.
 - Write each "title" (max 8 words) in ${LANG_NAMES[state.lang]}.
 
+Also write a social media pack for posting the finished video on ${PLATFORM_NAMES[state.platform]}, ${socialRules()}
+
 Respond with JSON only, in this shape:
-{"scenes":[{"title":"short scene title","prompt":"full English prompt","camera":"camera move in English","lighting":"lighting in English"}]}`;
+{"scenes":[{"title":"short scene title","prompt":"full English prompt","camera":"camera move in English","lighting":"lighting in English"}],
+ "social":{"title":"...","hook":"...","caption":"...","hashtags":["#..."],"music":"..."}}`;
+  }
+
+  // ---------- social media pack ----------
+  const PLATFORM_NAMES = { vertical: "TikTok, Instagram Reels and YouTube Shorts", wide: "YouTube", square: "Instagram" };
+  const SOCIAL_RULES = `written in ${"${LANG}"}:
+- "title": catchy video title, max 70 characters.
+- "hook": short text to show on screen in the first 2 seconds, max 8 words.
+- "caption": 1-3 short sentences that make people curious, ending with a question or call to action. Up to 2 fitting emoji.
+- "hashtags": 8-12 hashtags without spaces, mixing popular and specific ones.
+- "music": the style, mood and tempo of background music plus 1-2 sound effects to add. Describe the style; don't name copyrighted songs.`;
+  const socialRules = () => SOCIAL_RULES.replace("${LANG}", LANG_NAMES[state.lang]);
+
+  function cleanSocial(x) {
+    if (!x || typeof x !== "object") return null;
+    const tags = (Array.isArray(x.hashtags) ? x.hashtags : String(x.hashtags || "").split(/[\s,]+/))
+      .map((h) => String(h).trim().replace(/^#*/, "#").replace(/\s+/g, "")).filter((h) => h.length > 1).slice(0, 15);
+    const out = { title: String(x.title || "").slice(0, 120), hook: String(x.hook || "").slice(0, 80),
+      caption: String(x.caption || "").slice(0, 600), hashtags: tags, music: String(x.music || "").slice(0, 300) };
+    return out.title || out.caption ? out : null;
+  }
+
+  // A simple pack without AI, used in template mode and for older storyboards.
+  function templateSocial(r) {
+    const c = catById(r.category);
+    const first = splitIdea(r.idea)[0] || loc(c.name);
+    const tag = (s) => "#" + String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ığüşöç]/g, "");
+    const platformTags = { vertical: ["#shorts", "#reels", "#fyp"], wide: ["#youtube"], square: ["#instagram", "#reels"] }[r.platform] || [];
+    return {
+      title: first.replace(/[.!?。]+$/, "").slice(0, 70),
+      hook: (first.split(/\s+/).slice(0, 6).join(" ") + "…"),
+      caption: `${first} ${t("soc.cta")}`,
+      hashtags: [...new Set([tag(c.name.en), "#aivideo", "#aiart", ...platformTags, "#storytime"])],
+      music: t("soc.musicTpl"),
+      template: true
+    };
+  }
+
+  function socialText(soc) {
+    return [soc.title, soc.hook && `🎬 ${soc.hook}`, soc.caption, soc.hashtags.join(" "), soc.music && `🎵 ${soc.music}`].filter(Boolean).join("\n\n");
+  }
+
+  function renderSocial(r) {
+    const soc = r.social || templateSocial(r);
+    state.lastSocial = soc;
+    const row = (key, label, value) => value ? `
+      <div class="soc-row"><div class="soc-label">${esc(label)}</div>
+        <div class="soc-value">${esc(value)}</div>
+        <button class="copy small" data-soc="${key}">${esc(t("res.copy"))}</button></div>` : "";
+    $("social").innerHTML = `
+      <div class="soc-head">
+        <div><h3>📱 ${esc(t("soc.title"))}</h3><p class="hint">${esc(t("soc.sub", { platform: PLATFORM_NAMES[r.platform] || PLATFORM_NAMES.vertical }))}</p></div>
+        <div class="btn-row">
+          <button class="soft" data-soc="all">📋 ${esc(t("res.copyAll"))}</button>
+          ${state.ai ? `<button class="soft" id="socAiBtn">✨ ${esc(t(soc.template ? "soc.ai" : "soc.again"))}</button>` : ""}
+        </div>
+      </div>
+      ${row("title", t("soc.videoTitle"), soc.title)}
+      ${row("hook", t("soc.hook"), soc.hook)}
+      ${row("caption", t("soc.caption"), soc.caption)}
+      ${row("hashtags", t("soc.hashtags"), soc.hashtags.join(" "))}
+      ${row("music", t("soc.music"), soc.music)}`;
+  }
+
+  async function socialAI() {
+    const r = state.lastResult;
+    if (!r) return;
+    if (!aiAllowed()) { openAuth(state.user ? "verify" : "signin", false); return; }
+    const btn = $("socAiBtn");
+    if (btn) btn.disabled = true;
+    setStatus(t("status.thinking"), false, true);
+    try {
+      const raw = await callAI(
+        `You write social media posts for short AI videos. Write a pack for ${PLATFORM_NAMES[r.platform] || PLATFORM_NAMES.vertical}, ${socialRules()}\nRespond with JSON only: {"title":"...","hook":"...","caption":"...","hashtags":["#..."],"music":"..."}`,
+        `Video idea:\n${r.idea}\n\nScenes:\n${r.scenes.map((sc, i) => `${i + 1}. ${sc.title}`).join("\n")}`, true);
+      const soc = cleanSocial(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
+      if (!soc) throw new Error("No social pack");
+      r.social = soc;
+      renderSocial(r);
+      setStatus("");
+    } catch (err) {
+      console.error(err);
+      if (err.code === "auth" || err.code === "verify") { setStatus(""); openAuth(err.code === "verify" ? "verify" : "signin", false); return; }
+      setStatus(err.code === "daily" ? t("status.daily") : t("status.fallback"), true);
+    } finally {
+      if ($("socAiBtn")) $("socAiBtn").disabled = false;
+    }
   }
 
   async function callAI(system, user, json) {
@@ -322,11 +411,14 @@ Respond with JSON only, in this shape:
     const list = Array.isArray(parsed) ? parsed : parsed.scenes;
     const scenes = (Array.isArray(list) ? list : []).filter((x) => x && x.prompt);
     if (!scenes.length) throw new Error("No scenes");
-    return scenes.slice(0, 12).map((x) => ({
-      title: String(x.title || "").slice(0, 100), prompt: String(x.prompt),
-      camera: String(x.camera || ""), lighting: String(x.lighting || ""),
-      negative: s.negatives ? NEGATIVE : ""
-    }));
+    return {
+      social: Array.isArray(parsed) ? null : cleanSocial(parsed.social),
+      scenes: scenes.slice(0, 12).map((x) => ({
+        title: String(x.title || "").slice(0, 100), prompt: String(x.prompt),
+        camera: String(x.camera || ""), lighting: String(x.lighting || ""),
+        negative: s.negatives ? NEGATIVE : ""
+      }))
+    };
   }
 
   // ---------- actions ----------
@@ -342,11 +434,11 @@ Respond with JSON only, in this shape:
     if (wantAI && !aiAllowed()) { openAuth(state.user ? "verify" : "signin", true); return; }
     const s = settings();
     setBusy(true);
-    let scenes, engine = "template", fellBack = false, daily = false;
+    let scenes, social = null, engine = "template", fellBack = false, daily = false;
     try {
       if (wantAI) {
         setStatus(t("status.writing"), false, true);
-        scenes = await aiScenes(s);
+        ({ scenes, social } = await aiScenes(s));
         engine = "ai";
       }
     } catch (err) {
@@ -362,7 +454,8 @@ Respond with JSON only, in this shape:
     if (!scenes) scenes = templateScenes(s);
     const result = {
       created: new Date().toISOString(), engine, category: state.category, style: state.style,
-      platform: state.platform, tool: state.tool, aspect: s.aspect, duration: s.duration, dna: s.dna, idea: state.idea.trim(), scenes
+      platform: state.platform, tool: state.tool, aspect: s.aspect, duration: s.duration, dna: s.dna, idea: state.idea.trim(), scenes,
+      ...(social ? { social } : {})
     };
     renderResults(result);
     saveHistory(result);
@@ -446,7 +539,8 @@ Respond with JSON only, in this shape:
   function asText(r) {
     const c = catById(r.category);
     return `Forge Kuzey Studio — ${loc(c.name)} · ${loc(styleById(r.style).name)} · ${r.aspect} · ${r.duration}s\n${"=".repeat(60)}\n\n` +
-      r.scenes.map((sc, i) => `${t("res.scene", { n: i + 1 }).toUpperCase()}: ${sc.title}\n\n${cardText(sc)}`).join(`\n\n${"-".repeat(60)}\n\n`);
+      r.scenes.map((sc, i) => `${t("res.scene", { n: i + 1 }).toUpperCase()}: ${sc.title}\n\n${cardText(sc)}`).join(`\n\n${"-".repeat(60)}\n\n`) +
+      `\n\n${"=".repeat(60)}\n${t("soc.title").toUpperCase()}\n\n${socialText(r.social || templateSocial(r))}`;
   }
 
   function renderResults(r) {
@@ -481,6 +575,7 @@ Respond with JSON only, in this shape:
           ${sc.negative ? `<div class="avoid"><b>${esc(t("res.avoid"))}</b> ${esc(sc.negative)}</div>` : ""}
         </div>
       </article>`).join("");
+    renderSocial(r);
   }
 
   // Signed-in users keep their storyboards in Firestore (users/{uid}/storyboards); everyone also keeps a local copy.
@@ -525,6 +620,80 @@ Respond with JSON only, in this shape:
     renderHistory();
   }
 
+  // ---------- saved characters ----------
+  // Signed-in users keep them in Firestore (users/{uid}/characters); otherwise they stay on this device.
+  const charsRef = () => state.fb.db.collection("users").doc(state.user.uid).collection("characters");
+  const MAX_CHARS = 30;
+
+  async function loadCharacters() {
+    let list = LS.get("chars", []);
+    if (cloudOn()) {
+      try {
+        const snap = await charsRef().orderBy("created", "desc").limit(MAX_CHARS).get();
+        list = snap.docs.map((d) => ({ ...d.data(), _id: d.id }));
+      } catch (err) { console.error("Couldn't load characters", err); }
+    }
+    state.chars = list;
+    renderChars();
+  }
+
+  function renderChars() {
+    const list = state.chars || [];
+    $("charSaved").innerHTML = list.length
+      ? `<span class="char-label">${esc(t("chars.saved"))}</span>` + list.map((c, i) => `
+        <span class="char-chip">
+          <button class="char-use" data-char="${i}" title="${esc([c.look, c.outfit, c.place].filter(Boolean).join(" · "))}">👤 ${esc(c.name)}</button>
+          <button class="char-del" data-chardel="${i}" aria-label="${esc(t("chars.delete", { name: c.name }))}">×</button>
+        </span>`).join("")
+      : "";
+    $("charNote").textContent = state.authCfg && !cloudOn() ? t("chars.local") : list.length ? "" : t("chars.empty");
+  }
+
+  async function saveCharacter() {
+    const ch = state.ch;
+    if (!ch.who.trim()) { toast(t("chars.needWho")); $("chWho").focus(); return; }
+    const name = ch.who.trim().split(/[,;]/)[0].slice(0, 40);
+    const doc = { name, who: ch.who.trim(), look: ch.look.trim(), outfit: ch.outfit.trim(), place: ch.place.trim(), created: new Date().toISOString() };
+    const same = (state.chars || []).filter((c) => c.name.toLowerCase() === name.toLowerCase());
+    try {
+      if (cloudOn()) {
+        await Promise.all(same.filter((c) => c._id).map((c) => charsRef().doc(c._id).delete()));
+        await charsRef().add(doc);
+      } else {
+        const local = LS.get("chars", []).filter((c) => c.name.toLowerCase() !== name.toLowerCase());
+        local.unshift(doc);
+        LS.set("chars", local.slice(0, MAX_CHARS));
+      }
+      toast(t("chars.savedToast", { name }) + " ✓");
+    } catch (err) {
+      console.error(err);
+      toast(t("err.generic"));
+    }
+    loadCharacters();
+  }
+
+  function useCharacter(i) {
+    const c = state.chars[i];
+    if (!c) return;
+    state.ch = { who: c.who || "", look: c.look || "", outfit: c.outfit || "", place: c.place || "" };
+    renderControls(); renderSummary(); save();
+    toast("👤 " + c.name);
+  }
+
+  async function deleteCharacter(i) {
+    const c = state.chars[i];
+    if (!c) return;
+    try {
+      if (cloudOn() && c._id) await charsRef().doc(c._id).delete();
+      else LS.set("chars", LS.get("chars", []).filter((x) => x.name !== c.name));
+      toast(t("chars.deleted"));
+    } catch (err) {
+      console.error(err);
+      toast(t("err.generic"));
+    }
+    loadCharacters();
+  }
+
   // ---------- accounts (Firebase) ----------
   const FB_VERSION = "10.12.2";
   function loadScript(src) {
@@ -545,6 +714,7 @@ Respond with JSON only, in this shape:
       auth.onAuthStateChanged((u) => {
         state.user = u;
         renderMode();
+        loadCharacters();
         if (u && u.emailVerified && $("authDlg").open && $("authVerify").hidden === false) $("authDlg").close();
       });
     } catch (err) {
@@ -712,6 +882,8 @@ Respond with JSON only, in this shape:
     try {
       const snap = await storyboardsRef().limit(500).get();
       await Promise.all(snap.docs.map((d) => d.ref.delete()));
+      const chars = await charsRef().limit(200).get();
+      await Promise.all(chars.docs.map((d) => d.ref.delete()));
       await state.user.delete();
       state.user = null;
       LS.del("history");
@@ -824,6 +996,25 @@ Respond with JSON only, in this shape:
       if (r) { renderResults(r); $("historyDlg").close(); $("results").scrollIntoView({ behavior: "smooth" }); }
     });
 
+    // saved characters
+    $("saveCharBtn").addEventListener("click", saveCharacter);
+    $("charSaved").addEventListener("click", (e) => {
+      const del = e.target.closest("[data-chardel]");
+      if (del) { deleteCharacter(+del.dataset.chardel); return; }
+      const use = e.target.closest("[data-char]");
+      if (use) useCharacter(+use.dataset.char);
+    });
+
+    // social media pack
+    $("social").addEventListener("click", (e) => {
+      if (e.target.closest("#socAiBtn")) { socialAI(); return; }
+      const b = e.target.closest("[data-soc]");
+      if (!b || !state.lastSocial) return;
+      const soc = state.lastSocial;
+      const key = b.dataset.soc;
+      copyText(key === "all" ? socialText(soc) : key === "hashtags" ? soc.hashtags.join(" ") : soc[key]);
+    });
+
     // accounts
     $("accountBtn").addEventListener("click", openAccount);
     $("authClose").addEventListener("click", () => $("authDlg").close());
@@ -851,6 +1042,7 @@ Respond with JSON only, in this shape:
   }
 
   // ---------- start ----------
+  state.chars = LS.get("chars", []);
   bind();
   renderControls();
   applyI18n();

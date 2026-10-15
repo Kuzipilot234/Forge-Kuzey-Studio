@@ -262,3 +262,27 @@ dialog::backdrop { background: rgba(10, 12, 18, .5); }
 .guide ul { padding-left: 20px; display: grid; gap: 6px; }
 .guide a { color: var(--accent); font-weight: 600; }
 @media (max-width: 640px) { .shot-top { flex-wrap: wrap; } .shot-actions { justify-content: flex-start; } }
+
+/* ---------- saved characters ---------- */
+.char-saved { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.char-saved:empty { display: none; }
+.char-label { font-size: 13px; color: var(--muted); font-weight: 600; margin-right: 2px; }
+.char-chip { display: inline-flex; align-items: stretch; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.char-use { background: none; border: 0; padding: 6px 4px 6px 12px; font-size: 14px; font-weight: 500; }
+.char-use:hover { color: var(--accent); }
+.char-del { background: none; border: 0; padding: 0 10px 0 6px; color: var(--muted); font-size: 16px; }
+.char-del:hover { color: var(--warn); }
+.char-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.char-actions .hint { margin: 0; }
+
+/* ---------- social media pack ---------- */
+.social { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow); }
+.social:empty { display: none; }
+.soc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.soc-head h3 { font-size: 17px; }
+.soc-head .hint { margin: 2px 0 0; }
+.soc-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.soc-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding-top: 3px; }
+.soc-value { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+.copy.small { padding: 5px 12px; font-size: 13px; }
+@media (max-width: 640px) { .soc-row { grid-template-columns: minmax(0, 1fr) auto; } .soc-label { grid-column: 1 / -1; } }

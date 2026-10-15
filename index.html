@@ -72,11 +72,16 @@
 
         <h2 class="label"><span data-i18n="s2.char"></span> <span class="opt-tag" data-i18n="s2.optional"></span></h2>
         <p class="hint" data-i18n="s2.charHint"></p>
+        <div class="char-saved" id="charSaved"></div>
         <div class="char-grid">
           <label><span data-i18n="s2.who"></span><input id="chWho" data-i18n-ph="s2.whoPh"></label>
           <label><span data-i18n="s2.looks"></span><input id="chLook" data-i18n-ph="s2.looksPh"></label>
           <label><span data-i18n="s2.outfit"></span><input id="chOutfit" data-i18n-ph="s2.outfitPh"></label>
           <label><span data-i18n="s2.place"></span><input id="chPlace" data-i18n-ph="s2.placePh"></label>
+        </div>
+        <div class="char-actions">
+          <button class="soft" id="saveCharBtn"><span aria-hidden="true">💾</span> <span data-i18n="chars.save"></span></button>
+          <span class="hint" id="charNote"></span>
         </div>
         <div class="step-nav">
           <button class="back" data-go="1">← <span data-i18n="back"></span></button>
@@ -191,6 +196,7 @@
       </ol>
     </div>
     <div class="board" id="board"></div>
+    <section class="social" id="social" aria-live="polite"></section>
     <details class="guide" id="guide">
       <summary data-i18n="guide.title"></summary>
       <p data-i18n="guide.intro"></p>
