@@ -144,6 +144,21 @@ window.SF_DATA = {
       text: "moving impasto oil painting, visible thick brush strokes, rich textured color, painterly motion" }
   ],
 
+  // Video tools the prompts can be shaped for. "words" is the prompt length the tool handles best,
+  // "audio" is whether it generates sound (otherwise prompts describe only the picture).
+  tools: [
+    { id: "flow", name: "Gemini / Google Flow", icon: "✦", url: "https://labs.google/fx/tools/flow", ai: "Google Veo (Gemini / Google Flow)",
+      lengths: [4, 6, 8], def: 8, words: [70, 130], audio: true },
+    { id: "kling", name: "Kling", icon: "K", url: "https://app.klingai.com/", ai: "Kling AI",
+      lengths: [5, 10], def: 5, words: [40, 80], audio: false },
+    { id: "dreamina", name: "Dreamina", icon: "D", url: "https://dreamina.capcut.com/", ai: "Dreamina (CapCut)",
+      lengths: [5, 10], def: 5, words: [40, 90], audio: false },
+    { id: "pika", name: "Pika", icon: "P", url: "https://pika.art/", ai: "Pika",
+      lengths: [5], def: 5, words: [30, 70], audio: false },
+    { id: "other", name: null, icon: "…", url: "", ai: "text-to-video models",
+      lengths: [4, 6, 8, 10], def: 8, words: [60, 120], audio: true }
+  ],
+
   cameraMoves: {
     auto: ["slow dolly-in", "gentle tracking shot alongside the subject", "low-angle push-in", "smooth orbit around the subject", "static wide shot", "over-the-shoulder shot", "crane up reveal", "handheld close-up", "rack focus from foreground to subject", "slow pull-back reveal"],
     handheld: ["handheld close-up with natural sway", "handheld follow shot", "handheld medium shot, slight breathing motion"],

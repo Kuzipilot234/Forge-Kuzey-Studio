@@ -93,6 +93,11 @@
           <button data-pf="square" role="radio"><span class="frame f-11"></span><b data-i18n="pf.square"></b><small data-i18n="pf.squareSub"></small></button>
         </div>
 
+        <h2 class="label" data-i18n="s3.tool"></h2>
+        <div class="tool-grid" id="tools" role="radiogroup"></div>
+        <p class="hint" data-i18n="s3.toolHint"></p>
+        <p class="hint tool-silent" id="toolSilent" hidden></p>
+
         <div class="two-col">
           <div>
             <h2 class="label" data-i18n="s3.scenes"></h2>
@@ -103,9 +108,7 @@
           </div>
           <div>
             <h2 class="label" data-i18n="s3.length"></h2>
-            <div class="seg" id="lengthSeg">
-              <button data-v="4"></button><button data-v="6"></button><button data-v="8"></button>
-            </div>
+            <div class="seg" id="lengthSeg"></div>
           </div>
         </div>
         <p class="hint" data-i18n="s3.scenesHint"></p>
@@ -182,12 +185,19 @@
     <div class="howto">
       <b data-i18n="res.howTitle"></b>
       <ol>
-        <li data-i18n="res.how1"></li>
+        <li id="how1"></li>
         <li data-i18n="res.how2"></li>
         <li data-i18n="res.how3"></li>
       </ol>
     </div>
     <div class="board" id="board"></div>
+    <details class="guide" id="guide">
+      <summary data-i18n="guide.title"></summary>
+      <p data-i18n="guide.intro"></p>
+      <ul id="guideList"></ul>
+      <p data-i18n="guide.tip"></p>
+      <p class="hint" data-i18n="guide.check"></p>
+    </details>
   </section>
 
   <footer class="foot"><span data-i18n="foot"></span> · <a href="privacy" data-i18n="foot.privacy"></a></footer>

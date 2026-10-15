@@ -14,10 +14,10 @@
   const STORY_ACTS = ["Setup", "Rising conflict", "Climax", "Resolution"];
   const ASPECT = { vertical: "9:16", wide: "16:9", square: "1:1" };
   const LANG_NAMES = { en: "English", tr: "Turkish", es: "Spanish", de: "German" };
-  const SAVED = ["lang", "category", "style", "platform", "scenes", "length", "idea", "ch", "story", "camera", "pace", "audio", "dialogLang", "dialogTouched", "continuity", "negatives"];
+  const SAVED = ["lang", "category", "style", "platform", "tool", "scenes", "length", "idea", "ch", "story", "camera", "pace", "audio", "dialogLang", "dialogTouched", "continuity", "negatives"];
 
   const state = Object.assign({
-    lang: detectLang(), category: "daily", style: "real", platform: "vertical", scenes: "auto", length: "8",
+    lang: detectLang(), category: "daily", style: "real", platform: "vertical", tool: "flow", scenes: "auto", length: "8",
     idea: "", ch: { who: "", look: "", outfit: "", place: "" }, story: false, camera: "auto", pace: "balanced",
     audio: "full", dialogLang: null, dialogTouched: false, continuity: true, negatives: true
   }, pickSaved(LS.get("draft", {})), { step: 1, allTypes: false, ai: false, model: "", lastResult: null, busy: false,
@@ -64,14 +64,14 @@
     el.className = "status" + (isErr ? " err" : "");
     el.innerHTML = (busy ? '<span class="spinner"></span>' : "") + esc(msg);
   }
-  async function copyText(text) {
+  async function copyText(text, message) {
     try { await navigator.clipboard.writeText(text); }
     catch {
       const ta = document.createElement("textarea");
       ta.value = text; document.body.appendChild(ta); ta.select();
       document.execCommand("copy"); ta.remove();
     }
-    toast(t("toast.copied") + " ✓");
+    toast(message ? "✓ " + message : t("toast.copied") + " ✓");
   }
   function download(name, text, type) {
     const a = document.createElement("a");
@@ -86,8 +86,7 @@
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
     document.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); el.setAttribute("aria-label", el.title); });
-    document.querySelectorAll("#lengthSeg button").forEach((b) => { b.textContent = t("s3.sec", { n: b.dataset.v }); });
-    renderExamples(); renderTypes(); renderStyles(); renderMode(); renderSummary(); renderCount();
+    renderExamples(); renderTypes(); renderStyles(); renderTools(); renderControls(); renderGuide(); renderMode(); renderSummary(); renderCount();
     if (state.lastResult) renderResults(state.lastResult);
   }
 
@@ -114,7 +113,31 @@
       </button>`).join("");
   }
 
+  const toolById = (id) => D.tools.find((x) => x.id === id) || D.tools[0];
+  const toolName = (tool) => tool.name || t("tool.other");
+
+  function renderTools() {
+    $("tools").innerHTML = D.tools.map((x) => `
+      <button class="toolc" role="radio" aria-checked="${x.id === state.tool}" data-tool="${x.id}">
+        <span class="t-ico" aria-hidden="true">${esc(x.icon)}</span>
+        <span><b>${esc(toolName(x))}</b><small>${esc(t(`tool.${x.id}.sub`))}</small></span>
+      </button>`).join("");
+    const tool = toolById(state.tool);
+    $("toolSilent").hidden = tool.audio;
+    $("toolSilent").textContent = tool.audio ? "" : t("tool.silent", { tool: toolName(tool) });
+  }
+
+  function renderGuide() {
+    $("guideList").innerHTML = ["flow", "kling", "dreamina", "pika"].map((id) => {
+      const x = toolById(id);
+      return `<li><a href="${x.url}" target="_blank" rel="noopener">${esc(x.name)}</a> — ${esc(t("guide." + id))}</li>`;
+    }).join("");
+  }
+
   function renderControls() {
+    const tool = toolById(state.tool);
+    if (!tool.lengths.includes(+state.length)) state.length = String(tool.def);
+    $("lengthSeg").innerHTML = tool.lengths.map((n) => `<button data-v="${n}">${esc(t("s3.sec", { n }))}</button>`).join("");
     document.querySelectorAll("#platforms button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.pf === state.platform)));
     document.querySelectorAll("#scenesSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === String(state.scenes)));
     document.querySelectorAll("#lengthSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === String(state.length)));
@@ -154,7 +177,7 @@
       [t("sum.type"), `${c.icon} ${loc(c.name)}`, false, 2],
       [t("sum.style"), loc(styleById(state.style).name), false, 2],
       [t("sum.char"), who || t("sum.none"), !who, 2],
-      [t("sum.format"), `${t(pfKey)} · ${ASPECT[state.platform]} · ${t("s3.sec", { n: state.length })}`, false, 3],
+      [t("sum.format"), `${t(pfKey)} · ${ASPECT[state.platform]} · ${t("s3.sec", { n: state.length })} · ${toolName(toolById(state.tool))}`, false, 3],
       [t("sum.scenes"), scenes, false, 3]
     ];
     $("summaryList").innerHTML = rows.map(([k, v, empty, step]) => `
@@ -192,13 +215,14 @@
       sentences, fixed,
       count: fixed || (state.story ? 4 : Math.min(8, Math.max(3, sentences.length))),
       category: catById(state.category), style: styleById(state.style),
-      aspect: ASPECT[state.platform], duration: state.length, dna,
+      aspect: ASPECT[state.platform], duration: state.length, dna, tool: toolById(state.tool),
       story: state.story, camera: state.camera, pace: state.pace, audio: state.audio,
       dialogLang: state.dialogLang, continuity: state.continuity, negatives: state.negatives
     };
   }
 
   function audioText(s, i) {
+    if (!s.tool.audio) return ""; // this tool makes silent clips
     switch (s.audio) {
       case "silent": return "No audio.";
       case "music": return "Audio: cinematic music bed matching the mood, no dialogue.";
@@ -239,7 +263,8 @@
     const countRule = s.fixed
       ? `Produce EXACTLY ${s.fixed} scenes.`
       : s.story ? "Produce EXACTLY 4 scenes." : "Produce between 3 and 8 scenes, whatever best fits the idea (usually one per key moment).";
-    return `You are an expert AI video director. You turn a short video idea into a storyboard of shot prompts for Google Gemini / Veo.
+    const [minW, maxW] = s.tool.words;
+    return `You are an expert AI video director. You turn a short video idea into a storyboard of shot prompts for ${s.tool.ai}.
 
 Rules:
 - ${countRule}
@@ -249,9 +274,9 @@ Rules:
 - Visual style (repeat it in every prompt): ${s.style.text}
 ${s.dna ? `- Character and setting (copy these details word for word into EVERY prompt so nothing drifts between scenes): ${s.dna}` : "- Invent one clear main character or subject and describe them identically in every prompt."}
 - ${s.continuity ? "Continuity: each scene starts exactly where the previous one ended." : "Scenes may jump in time or place."}
-- Each "prompt" is one paragraph of 70-130 words IN ENGLISH covering: subject and appearance, action, setting, camera movement and framing, lighting, mood and sound.
+- Each "prompt" is one paragraph of ${minW}-${maxW} words IN ENGLISH covering: subject and appearance, action, setting, camera movement and framing, lighting${s.tool.audio ? ", mood and sound" : " and mood"}.${maxW <= 90 ? " This tool works best with short, clear prompts: one main action per scene, no long lists of details." : ""}
 - Camera preference: ${s.camera}. Pacing: ${s.pace}.
-- Sound: ${{ full: `ambience, sound effects and short natural dialogue in ${s.dialogLang} (put spoken words in double quotes)`, sfx: "ambience and sound effects, no dialogue", music: "music only, no dialogue", silent: "no audio" }[s.audio]}.
+- Sound: ${!s.tool.audio ? "this tool makes silent clips, so do not describe sound, music or dialogue; show emotions through faces and body language" : { full: `ambience, sound effects and short natural dialogue in ${s.dialogLang} (put spoken words in double quotes)`, sfx: "ambience and sound effects, no dialogue", music: "music only, no dialogue", silent: "no audio" }[s.audio]}.
 - End every prompt with: "Format: ${s.aspect}, ${s.duration} seconds."
 - No on-screen text or subtitles. Keep everything safe for all audiences.
 - Write each "title" (max 8 words) in ${LANG_NAMES[state.lang]}.
@@ -337,7 +362,7 @@ Respond with JSON only, in this shape:
     if (!scenes) scenes = templateScenes(s);
     const result = {
       created: new Date().toISOString(), engine, category: state.category, style: state.style,
-      platform: state.platform, aspect: s.aspect, duration: s.duration, dna: s.dna, idea: state.idea.trim(), scenes
+      platform: state.platform, tool: state.tool, aspect: s.aspect, duration: s.duration, dna: s.dna, idea: state.idea.trim(), scenes
     };
     renderResults(result);
     saveHistory(result);
@@ -428,7 +453,11 @@ Respond with JSON only, in this shape:
     state.lastResult = r;
     $("results").hidden = false;
     const len = +r.duration;
-    $("resMeta").textContent = t("res.meta", { n: r.scenes.length, aspect: r.aspect, total: r.scenes.length * len });
+    const tool = toolById(r.tool || "flow");
+    $("resMeta").textContent = t("res.meta", { n: r.scenes.length, aspect: r.aspect, total: r.scenes.length * len }) + " · " + toolName(tool);
+    $("how1").textContent = t("res.how1", { tool: tool.url ? toolName(tool) : t("tool.other").toLowerCase() });
+    const openBtn = (i) => tool.url
+      ? `<a class="open-tool" href="${tool.url}" target="_blank" rel="noopener" data-open="${i}">${esc(t("res.open", { tool: toolName(tool) }))} ↗</a>` : "";
     $("board").innerHTML = r.scenes.map((sc, i) => `
       <article class="shot">
         <div class="shot-side">
@@ -439,7 +468,10 @@ Respond with JSON only, in this shape:
         <div class="shot-main">
           <div class="shot-top">
             <h3>${esc(sc.title || t("res.scene", { n: i + 1 }))}${r.example ? `<span class="example-badge">${esc(t("res.example"))}</span>` : ""}</h3>
-            <button class="copy" data-copy="${i}">${esc(t("res.copy"))}</button>
+            <div class="shot-actions">
+              <button class="copy" data-copy="${i}">${esc(t("res.copy"))}</button>
+              ${openBtn(i)}
+            </div>
           </div>
           <pre>${esc(sc.prompt)}</pre>
           <div class="tags">
@@ -747,6 +779,11 @@ Respond with JSON only, in this shape:
       if (!b) return;
       state.scenes = b.dataset.v; renderControls(); renderSummary(); save();
     });
+    $("tools").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tool]");
+      if (!b) return;
+      state.tool = b.dataset.tool; renderTools(); renderControls(); renderSummary(); save();
+    });
     $("lengthSeg").addEventListener("click", (e) => {
       const b = e.target.closest("[data-v]");
       if (!b) return;
@@ -760,6 +797,12 @@ Respond with JSON only, in this shape:
     $("sumGenerate").addEventListener("click", generate);
 
     $("board").addEventListener("click", (e) => {
+      // "Open in <tool>": copy the prompt, then let the link open the tool in a new tab.
+      const open = e.target.closest("[data-open]");
+      if (open && state.lastResult) {
+        copyText(cardText(state.lastResult.scenes[+open.dataset.open]), t("res.copiedFor", { tool: toolName(toolById(state.lastResult.tool || "flow")) }));
+        return;
+      }
       const b = e.target.closest("[data-copy]");
       if (!b || !state.lastResult) return;
       copyText(cardText(state.lastResult.scenes[+b.dataset.copy]));
@@ -821,7 +864,7 @@ Respond with JSON only, in this shape:
     const s = settings();
     state.idea = keep;
     renderResults({ created: new Date().toISOString(), engine: "template", example: true, category: ex.cat, style: state.style,
-      platform: state.platform, aspect: s.aspect, duration: s.duration, dna: "", idea: ex.text,
+      platform: state.platform, tool: state.tool, aspect: s.aspect, duration: s.duration, dna: "", idea: ex.text,
       scenes: templateScenes({ ...s, count: 3, category: catById(ex.cat) }) });
     setStatus(t("status.example"));
   }
