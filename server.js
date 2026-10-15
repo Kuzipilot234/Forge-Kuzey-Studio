@@ -26,16 +26,21 @@ const MAX_BODY = 20000;                                      // characters
 const RETRY_STATUSES = [404, 429, 500, 502, 503];             // worth trying another model
 
 // ---- accounts (optional) ----
-// Paste the firebaseConfig block from the Firebase console into the FIREBASE_CONFIG variable.
-// When it is set, only signed-in users with a verified email can use the AI, AI_DAILY_LIMIT times a day.
-const FIREBASE = parseFirebaseConfig(process.env.FIREBASE_CONFIG);
+// The Firebase web config comes from the FIREBASE_CONFIG variable or, if that is missing or broken,
+// from firebase-config.js in this repo (the web config is public by design, it is not a secret).
+// When accounts are on, only signed-in users with a verified email can use the AI, AI_DAILY_LIMIT times a day.
+const FIREBASE = parseFirebaseConfig(process.env.FIREBASE_CONFIG, "FIREBASE_CONFIG") || parseFirebaseConfig(readConfigFile(), "firebase-config.js");
 const AI_DAILY_LIMIT = +(process.env.AI_DAILY_LIMIT || 30);
 
-function parseFirebaseConfig(raw) {
+function readConfigFile() {
+  try { return fs.readFileSync(path.join(__dirname, "firebase-config.js"), "utf8"); } catch { return ""; }
+}
+function parseFirebaseConfig(raw, source) {
   if (!raw) return null;
   const o = {};
-  for (const m of String(raw).matchAll(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g)) o[m[1]] = m[2];
-  if (!o.apiKey || !o.projectId) { console.error("FIREBASE_CONFIG is set but has no apiKey/projectId; accounts are off"); return null; }
+  for (const m of String(raw).replace(/\/\/.*$/gm, "").matchAll(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g)) o[m[1]] = m[2];
+  if (!o.apiKey || !o.projectId) { console.error(`${source} has no apiKey/projectId; ignoring it`); return null; }
+  if (!/^AIza[0-9A-Za-z_-]{35}$/.test(o.apiKey)) { console.error(`${source} has a broken apiKey (hidden or mistyped characters); ignoring it`); return null; }
   return { apiKey: o.apiKey, authDomain: o.authDomain || `${o.projectId}.firebaseapp.com`, projectId: o.projectId, appId: o.appId, messagingSenderId: o.messagingSenderId, storageBucket: o.storageBucket };
 }
 
