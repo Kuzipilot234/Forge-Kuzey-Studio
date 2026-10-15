@@ -19,7 +19,7 @@ Turn a scenario into consistent, cinematic, **scene-by-scene prompts for Gemini 
 
 ## How the API key works
 
-The API key is **never** in this repo or in the browser. It is stored in the `GEMINI_API_KEY` environment variable on the server. `server.js` serves the site and forwards AI requests to Gemini. Each visitor is limited to 30 AI requests per 10 minutes so nobody can use up the quota.
+The API key is **never** in this repo or in the browser. It is stored in the `GEMINI_API_KEY` environment variable on the server. `server.js` serves the site and forwards AI requests to Gemini, and to Groq as a backup if `GROQ_API_KEY` is also set. Each visitor is limited to 30 AI requests per 10 minutes so nobody can use up the quota.
 
 **To change the key:** Render dashboard → your service → **Environment** → edit `GEMINI_API_KEY` → **Save changes**. Render restarts the site with the new key, and nothing in the code changes.
 
@@ -28,7 +28,8 @@ Optional environment variables:
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `GEMINI_MODEL` | `gemini-flash-latest` | Any Gemini model name. If Google rejects it, a few known model names are tried in turn. |
-| `GROQ_API_KEY` | (none) | Use Groq instead of Gemini. Only used when `GEMINI_API_KEY` is not set. |
+| `GROQ_API_KEY` | (none) | Backup AI. Used when every Gemini model is busy or failing, or on its own if there is no Gemini key. The server picks a model your Groq key can use. |
+| `GROQ_MODEL` | (auto) | Force a specific Groq model |
 | `RATE_LIMIT` | `30` | AI requests per visitor per 10 minutes |
 
 ## Deploy on Render

@@ -1,5 +1,6 @@
-// Forge Kuzey Studio server: serves the site and forwards AI requests to Google Gemini
-// (or Groq, if only a Groq key is set). Keys live only in environment variables, never in the browser.
+// Forge Kuzey Studio server: serves the site and forwards AI requests.
+// Google Gemini is tried first; if every Gemini model fails, Groq takes over (when its key is set).
+// Keys live only in environment variables, never in the browser.
 // No dependencies; needs Node 18+ (built-in fetch).
 "use strict";
 const http = require("http");
@@ -9,21 +10,27 @@ const path = require("path");
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || "").trim();
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || "").trim();
-// "gemini-flash-latest" always points at Google's newest Flash model. If Google rejects a name,
-// the next one in the list is tried.
+// "gemini-flash-latest" always points at Google's newest Flash model. If one model is
+// unknown, busy or out of quota, the next one in the list is tried.
 const GEMINI_MODELS = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview", "gemini-2.5-flash"]
   .filter((m, i, a) => m && a.indexOf(m) === i);
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const PROVIDER = GEMINI_API_KEY ? "gemini" : GROQ_API_KEY ? "groq" : "";
+// Groq changes its model list often, so the server asks Groq which models the key can use
+// and picks from this preference order.
+const GROQ_PREFERRED = [process.env.GROQ_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+  .filter((m, i, a) => m && a.indexOf(m) === i);
+const PROVIDERS = [GEMINI_API_KEY && "gemini", GROQ_API_KEY && "groq"].filter(Boolean);
 const RATE_LIMIT = +(process.env.RATE_LIMIT || 30);          // requests per visitor…
 const RATE_WINDOW_MS = 10 * 60 * 1000;                       // …per 10 minutes
 const MAX_BODY = 20000;                                      // characters
+const RETRY_STATUSES = [404, 429, 500, 502, 503];             // worth trying another model
 
 const ROOT = __dirname;
 const PUBLIC_FILES = { "/": "index.html", "/index.html": "index.html", "/style.css": "style.css", "/data.js": "data.js", "/i18n.js": "i18n.js", "/app.js": "app.js" };
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
-let geminiModel = GEMINI_MODELS[0]; // remembers the first model name that worked
+let geminiModel = GEMINI_MODELS[0];  // remembers the last Gemini model that worked
+let groqModels = null;               // filled from Groq's model list on first use
+let lastUsed = "";                   // "provider:model" of the last successful answer
 
 // ---- simple in-memory rate limiter ----
 const hits = new Map();
@@ -61,7 +68,9 @@ function readBody(req) {
 class AIError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
+const hideKeys = (s) => [GEMINI_API_KEY, GROQ_API_KEY].filter(Boolean).reduce((out, k) => out.replaceAll(k, "***"), String(s || ""));
 
+// ---- Gemini ----
 async function callGemini(system, user, json) {
   const order = [geminiModel, ...GEMINI_MODELS.filter((m) => m !== geminiModel)];
   let lastError;
@@ -77,39 +86,79 @@ async function callGemini(system, user, json) {
     });
     const data = await r.json().catch(() => ({}));
     if (r.ok) {
-      geminiModel = model;
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      return parts.filter((p) => !p.thought).map((p) => p.text || "").join("");
+      const text = (data?.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("");
+      if (text) { geminiModel = model; lastUsed = "gemini:" + model; return text; }
+      lastError = new AIError(502, `[gemini ${model}] empty answer`);
+      continue;
     }
-    console.error(`Gemini error with ${model}:`, r.status, data?.error?.message);
-    lastError = new AIError(r.status, `[${model}] ${data?.error?.message || ""}`);
-    // Unknown model (404), out of free quota for this model (429) or overloaded (500/503):
-    // try the next model. Anything else (e.g. a bad key) won't be fixed by another model.
-    if (![404, 429, 500, 503].includes(r.status)) break;
+    console.error(`Gemini ${model}:`, r.status, data?.error?.message);
+    lastError = new AIError(r.status, `[gemini ${model}] ${data?.error?.message || ""}`);
+    if (!RETRY_STATUSES.includes(r.status)) break;
   }
   throw lastError;
 }
 
-async function callGroq(system, user, json) {
-  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: GROQ_MODEL, temperature: 0.9, max_tokens: 8000,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      ...(json ? { response_format: { type: "json_object" } } : {})
-    })
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    console.error("Groq error", r.status, data?.error?.message);
-    throw new AIError(r.status, data?.error?.message);
+// ---- Groq ----
+async function groqModelList() {
+  if (groqModels) return groqModels;
+  try {
+    const r = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${GROQ_API_KEY}` } });
+    const data = await r.json();
+    const ids = (data?.data || []).filter((m) => m.active !== false).map((m) => m.id);
+    const chat = ids.filter((id) => !/whisper|guard|tts|orpheus|playai|vision|embed/i.test(id));
+    const list = [...GROQ_PREFERRED.filter((id) => ids.includes(id)), ...chat.filter((id) => !GROQ_PREFERRED.includes(id))];
+    if (list.length) groqModels = list;
+  } catch (err) {
+    console.error("Couldn't read Groq's model list:", err.message);
   }
-  return data?.choices?.[0]?.message?.content || "";
+  return groqModels || GROQ_PREFERRED;
+}
+
+async function callGroq(system, user, json) {
+  const models = (await groqModelList()).slice(0, 4);
+  let lastError;
+  for (const model of models) {
+    for (const useJsonMode of json ? [true, false] : [false]) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model, temperature: 0.9, max_tokens: 8000,
+          messages: [{ role: "system", content: system }, { role: "user", content: user }],
+          ...(useJsonMode ? { response_format: { type: "json_object" } } : {})
+        })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const text = data?.choices?.[0]?.message?.content || "";
+        if (text) { lastUsed = "groq:" + model; return text; }
+        lastError = new AIError(502, `[groq ${model}] empty answer`);
+        break;
+      }
+      console.error(`Groq ${model}:`, r.status, data?.error?.message);
+      lastError = new AIError(r.status, `[groq ${model}] ${data?.error?.message || ""}`);
+      // A 400 in JSON mode may just mean the model doesn't support it: retry once without.
+      if (!(r.status === 400 && useJsonMode)) break;
+    }
+    if (lastError && !RETRY_STATUSES.includes(lastError.status) && lastError.status !== 400) break;
+  }
+  throw lastError;
+}
+
+async function askAI(system, user, json) {
+  let lastError;
+  for (const provider of PROVIDERS) {
+    try {
+      return provider === "gemini" ? await callGemini(system, user, json) : await callGroq(system, user, json);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 async function handleGenerate(req, res) {
-  if (!PROVIDER) return send(res, 503, { error: "The server has no AI key set" });
+  if (!PROVIDERS.length) return send(res, 503, { error: "The server has no AI key set" });
   const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
   if (rateLimited(ip)) return send(res, 429, { error: "Too many requests. Please wait a few minutes and try again" });
 
@@ -121,13 +170,12 @@ async function handleGenerate(req, res) {
   if (!user) return send(res, 400, { error: "Empty request" });
 
   try {
-    const text = PROVIDER === "gemini" ? await callGemini(system, user, input.json) : await callGroq(system, user, input.json);
-    send(res, 200, { text });
+    send(res, 200, { text: await askAI(system, user, input.json) });
   } catch (err) {
     if (!(err instanceof AIError)) console.error(err);
     const status = err instanceof AIError ? err.status : 0;
-    // "detail" carries the provider's own reason (never the key) so problems can be diagnosed.
-    const detail = `${status || "network"} ${String(err.message || "").replaceAll(GEMINI_API_KEY || "\u0000", "***").replaceAll(GROQ_API_KEY || "\u0000", "***")}`.slice(0, 300);
+    // "detail" carries the provider's own reason (never a key) so problems can be diagnosed.
+    const detail = `${status || "network"} ${hideKeys(err.message)}`.slice(0, 300);
     send(res, 502, { error: status === 429 ? "The AI is busy right now. Try again in a minute" : status ? "The AI service returned an error" : "Couldn't reach the AI service", detail });
   }
 }
@@ -135,7 +183,7 @@ async function handleGenerate(req, res) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/api/health") {
-    return send(res, 200, { ai: Boolean(PROVIDER), provider: PROVIDER, model: PROVIDER === "gemini" ? geminiModel : PROVIDER === "groq" ? GROQ_MODEL : "" });
+    return send(res, 200, { ai: PROVIDERS.length > 0, providers: PROVIDERS, model: lastUsed || (PROVIDERS[0] === "gemini" ? "gemini:" + geminiModel : PROVIDERS[0] || "") });
   }
   if (url.pathname === "/api/generate") {
     if (req.method !== "POST") return send(res, 405, { error: "Use POST" });
@@ -148,4 +196,4 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(file)], "Cache-Control": "no-cache" });
     res.end(buf);
   });
-}).listen(PORT, () => console.log(`Forge Kuzey Studio running on port ${PORT} (AI: ${PROVIDER || "off"}${PROVIDER === "gemini" ? ", model " + geminiModel : ""})`));
+}).listen(PORT, () => console.log(`Forge Kuzey Studio running on port ${PORT} (AI: ${PROVIDERS.join(" → ") || "off"})`));
