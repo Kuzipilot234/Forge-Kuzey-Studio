@@ -20,7 +20,8 @@
     lang: detectLang(), category: "daily", style: "real", platform: "vertical", scenes: "auto", length: "8",
     idea: "", ch: { who: "", look: "", outfit: "", place: "" }, story: false, camera: "auto", pace: "balanced",
     audio: "full", dialogLang: null, dialogTouched: false, continuity: true, negatives: true
-  }, pickSaved(LS.get("draft", {})), { step: 1, allTypes: false, ai: false, model: "", lastResult: null, busy: false });
+  }, pickSaved(LS.get("draft", {})), { step: 1, allTypes: false, ai: false, model: "", lastResult: null, busy: false,
+    authCfg: null, user: null, dailyLimit: null, fb: null, authMode: "signin", histList: [] });
   if (!I[state.lang]) state.lang = "en";
   if (!state.dialogLang) state.dialogLang = LANG_NAMES[state.lang];
 
@@ -125,11 +126,16 @@
     $("dialogLang").value = state.dialogLang;
   }
 
+  // AI can be used when the server has a key and, if accounts are on, the visitor is signed in and verified.
+  const aiAllowed = () => state.ai && (!state.authCfg || Boolean(state.user && state.user.emailVerified));
+
   function renderMode() {
     const b = $("modeBadge");
-    b.textContent = state.ai ? "● " + t("mode.ai") : t("mode.tpl");
-    b.classList.toggle("on", state.ai);
+    const allowed = aiAllowed();
+    b.textContent = !state.ai ? t("mode.tpl") : allowed ? "● " + t("mode.ai") : t("mode.signin");
+    b.classList.toggle("on", allowed);
     $("improveBtn").hidden = !state.ai;
+    renderAccount();
   }
 
   function renderCount() {
@@ -255,13 +261,15 @@ Respond with JSON only, in this shape:
   }
 
   async function callAI(system, user, json) {
-    const res = await fetch("api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ system, user, json })
-    });
+    const headers = { "Content-Type": "application/json" };
+    if (state.user) headers.Authorization = "Bearer " + await state.user.getIdToken();
+    const res = await fetch("api/generate", { method: "POST", headers, body: JSON.stringify({ system, user, json }) });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+    if (!res.ok) {
+      const err = new Error(data.error || `Server error ${res.status}`);
+      err.code = data.code;
+      throw err;
+    }
     if (!data.text) throw new Error("Empty answer");
     return data.text;
   }
@@ -272,6 +280,11 @@ Respond with JSON only, in this shape:
       const data = res.ok ? await res.json() : {};
       state.ai = Boolean(data.ai);
       state.model = data.model || "";
+      if (data.auth) {
+        state.authCfg = data.auth;
+        state.dailyLimit = data.dailyLimit;
+        initAuth();
+      }
     } catch { state.ai = false; }
     renderMode();
   }
@@ -292,7 +305,7 @@ Respond with JSON only, in this shape:
   }
 
   // ---------- actions ----------
-  async function generate() {
+  async function generate(opts = {}) {
     if (state.busy) return;
     if (!state.idea.trim()) {
       goStep(1);
@@ -300,17 +313,25 @@ Respond with JSON only, in this shape:
       $("idea").focus();
       return;
     }
+    const wantAI = state.ai && !opts.template;
+    if (wantAI && !aiAllowed()) { openAuth(state.user ? "verify" : "signin", true); return; }
     const s = settings();
     setBusy(true);
-    let scenes, engine = "template", fellBack = false;
+    let scenes, engine = "template", fellBack = false, daily = false;
     try {
-      if (state.ai) {
+      if (wantAI) {
         setStatus(t("status.writing"), false, true);
         scenes = await aiScenes(s);
         engine = "ai";
       }
     } catch (err) {
       console.error(err);
+      if (err.code === "auth" || err.code === "verify") {
+        setBusy(false); setStatus("");
+        openAuth(err.code === "verify" ? "verify" : "signin", true);
+        return;
+      }
+      daily = err.code === "daily";
       fellBack = true;
     }
     if (!scenes) scenes = templateScenes(s);
@@ -320,7 +341,7 @@ Respond with JSON only, in this shape:
     };
     renderResults(result);
     saveHistory(result);
-    setStatus(fellBack ? t("status.fallback") : t("status.ready"), fellBack);
+    setStatus(daily ? t("status.daily") : fellBack ? t("status.fallback") : t("status.ready"), fellBack);
     setBusy(false);
     $("results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -332,7 +353,7 @@ Respond with JSON only, in this shape:
 
   async function surprise() {
     const examples = I[state.lang].examples || I.en.examples;
-    if (!state.ai) {
+    if (!aiAllowed()) {
       const options = examples.filter((e) => e.text !== state.idea);
       const ex = rand(options.length ? options : examples);
       useIdea(ex.text, ex.cat);
@@ -348,6 +369,7 @@ Respond with JSON only, in this shape:
 
   async function improve() {
     if (!state.idea.trim()) { setStatus(t("status.needImprove"), true); $("idea").focus(); return; }
+    if (!aiAllowed()) { openAuth(state.user ? "verify" : "signin", false); return; }
     await aiHelper(
       `Improve this short-video idea for AI video generation. Answer in the same language the idea is written in. Keep the story and names. Use 3-6 short sentences, each one a clear visual moment with a specific place and one vivid detail. Plain text only, no title, no list.\n\nIdea:\n${state.idea.trim()}`,
       (text) => { state.idea = text; renderControls(); renderSummary(); renderCount(); save(); toast(t("toast.improved")); },
@@ -365,7 +387,8 @@ Respond with JSON only, in this shape:
       setStatus("");
     } catch (err) {
       console.error(err);
-      setStatus(t("status.fallback"), true);
+      if (err.code === "auth" || err.code === "verify") { setStatus(""); openAuth(err.code === "verify" ? "verify" : "signin", false); return; }
+      setStatus(err.code === "daily" ? t("status.daily") : t("status.fallback"), true);
       if (btnId === "surpriseBtn") { const ex = rand(I[state.lang].examples || I.en.examples); useIdea(ex.text, ex.cat); }
     } finally {
       btn.disabled = false;
@@ -428,17 +451,247 @@ Respond with JSON only, in this shape:
       </article>`).join("");
   }
 
+  // Signed-in users keep their storyboards in Firestore (users/{uid}/storyboards); everyone also keeps a local copy.
+  const cloudOn = () => Boolean(state.fb && state.user && state.user.emailVerified);
+  const storyboardsRef = () => state.fb.db.collection("users").doc(state.user.uid).collection("storyboards");
+
   function saveHistory(r) {
     const h = LS.get("history", []);
     h.unshift(r);
     LS.set("history", h.slice(0, 15));
+    if (cloudOn()) {
+      const { example, ...doc } = r;
+      storyboardsRef().add(JSON.parse(JSON.stringify(doc)))
+        .then(() => toast(t("hist.cloud") + " ✓"))
+        .catch((err) => console.error("Cloud save failed", err));
+    }
   }
-  function renderHistory() {
-    const h = LS.get("history", []);
-    $("historyList").innerHTML = h.length
-      ? h.map((r, i) => `<button class="hist-item" data-h="${i}"><b>${catById(r.category).icon} ${esc(loc(catById(r.category).name))}</b> · ${r.scenes.length}
+
+  async function renderHistory() {
+    let list = LS.get("history", []);
+    if (cloudOn()) {
+      try {
+        const snap = await storyboardsRef().orderBy("created", "desc").limit(30).get();
+        list = snap.docs.map((d) => ({ ...d.data(), _id: d.id }));
+      } catch (err) { console.error("Cloud history failed", err); }
+    }
+    state.histList = list;
+    $("historyList").innerHTML = list.length
+      ? list.map((r, i) => `<button class="hist-item" data-h="${i}"><b>${catById(r.category).icon} ${esc(loc(catById(r.category).name))}</b> · ${(r.scenes || []).length}
           <small>${esc(new Date(r.created).toLocaleString(state.lang))} — ${esc((r.idea || "").slice(0, 80))}</small></button>`).join("")
       : `<p class="hint">${esc(t("hist.empty"))}</p>`;
+  }
+
+  async function clearHistory() {
+    LS.del("history");
+    if (cloudOn()) {
+      try {
+        const snap = await storyboardsRef().limit(200).get();
+        await Promise.all(snap.docs.map((d) => d.ref.delete()));
+      } catch (err) { console.error("Cloud clear failed", err); }
+    }
+    renderHistory();
+  }
+
+  // ---------- accounts (Firebase) ----------
+  const FB_VERSION = "10.12.2";
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve; s.onerror = () => reject(new Error("Couldn't load " + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function initAuth() {
+    try {
+      for (const lib of ["app", "auth", "firestore"]) await loadScript(`https://www.gstatic.com/firebasejs/${FB_VERSION}/firebase-${lib}-compat.js`);
+      const app = window.firebase.initializeApp(state.authCfg);
+      const auth = app.auth();
+      auth.languageCode = state.lang;
+      state.fb = { auth, db: app.firestore(), google: new window.firebase.auth.GoogleAuthProvider() };
+      auth.onAuthStateChanged((u) => {
+        state.user = u;
+        renderMode();
+        if (u && u.emailVerified && $("authDlg").open && $("authVerify").hidden === false) $("authDlg").close();
+      });
+    } catch (err) {
+      console.error("Accounts unavailable", err);
+    }
+    renderAccount();
+  }
+
+  function renderAccount() {
+    const b = $("accountBtn");
+    b.hidden = !state.authCfg;
+    if (!state.authCfg) return;
+    const u = state.user;
+    b.innerHTML = u
+      ? `<span class="avatar">${esc((u.email || "?")[0].toUpperCase())}</span>${esc(u.email || "")}`
+      : esc(t("nav.signin"));
+  }
+
+  function authError(err) {
+    const code = String(err && err.code || "").replace("auth/", "");
+    const map = {
+      "invalid-credential": "err.invalid", "wrong-password": "err.invalid", "user-not-found": "err.invalid", "invalid-login-credentials": "err.invalid",
+      "email-already-in-use": "err.exists", "weak-password": "err.weak", "invalid-email": "err.email", "missing-email": "err.email",
+      "too-many-requests": "err.many", "network-request-failed": "err.network",
+      "popup-closed-by-user": "err.popup", "cancelled-popup-request": "err.popup", "unauthorized-domain": "err.domain",
+      "requires-recent-login": "auth.recent"
+    };
+    if (!map[code]) console.error(err);
+    return t(map[code] || "err.generic");
+  }
+  function authMsg(msg, isErr = false, id = "authMsg") {
+    const el = $(id);
+    el.textContent = msg || "";
+    el.classList.toggle("err", isErr);
+  }
+
+  function setAuthMode(mode) {
+    state.authMode = mode;
+    const signup = mode === "signup";
+    $("authTitle").textContent = t(signup ? "auth.signupTitle" : "auth.signinTitle");
+    $("authSubmit").textContent = t(signup ? "auth.signupBtn" : "auth.signinBtn");
+    $("switchModeBtn").textContent = t(signup ? "auth.toSignin" : "auth.toSignup");
+    $("authPass").autocomplete = signup ? "new-password" : "current-password";
+    $("passHint").hidden = !signup;
+    $("privacyNote").hidden = !signup;
+    $("forgotBtn").hidden = signup;
+    authMsg("");
+  }
+
+  function openAuth(view, forAI) {
+    if (!state.fb) { if (state.authCfg) toast(t("err.generic")); return; }
+    $("authNote").hidden = !forAI;
+    const verify = view === "verify" && state.user;
+    $("authForms").hidden = Boolean(verify);
+    $("authVerify").hidden = !verify;
+    if (verify) $("verifyText").textContent = t("auth.verifyText", { email: state.user.email });
+    else setAuthMode(view === "signup" ? "signup" : "signin");
+    authMsg("");
+    if (!$("authDlg").open) $("authDlg").showModal();
+  }
+
+  async function submitAuth(e) {
+    e.preventDefault();
+    const email = $("authEmail").value.trim();
+    const pass = $("authPass").value;
+    const btn = $("authSubmit");
+    btn.disabled = true;
+    authMsg("");
+    try {
+      if (state.authMode === "signup") {
+        const cred = await state.fb.auth.createUserWithEmailAndPassword(email, pass);
+        await cred.user.sendEmailVerification();
+        state.user = cred.user;
+        openAuth("verify", !$("authNote").hidden);
+      } else {
+        const cred = await state.fb.auth.signInWithEmailAndPassword(email, pass);
+        state.user = cred.user;
+        if (!cred.user.emailVerified) openAuth("verify", !$("authNote").hidden);
+        else { $("authDlg").close(); toast("✓ " + cred.user.email); }
+      }
+      $("authPass").value = "";
+      renderMode();
+    } catch (err) {
+      authMsg(authError(err), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function googleSignIn() {
+    authMsg("");
+    try {
+      const cred = await state.fb.auth.signInWithPopup(state.fb.google);
+      state.user = cred.user;
+      $("authDlg").close();
+      renderMode();
+      toast("✓ " + (cred.user.email || ""));
+    } catch (err) {
+      authMsg(authError(err), true);
+    }
+  }
+
+  async function forgotPassword() {
+    const email = $("authEmail").value.trim();
+    if (!email) { authMsg(t("auth.needEmail"), true); $("authEmail").focus(); return; }
+    try {
+      await state.fb.auth.sendPasswordResetEmail(email);
+      authMsg(t("auth.resetSent", { email }));
+    } catch (err) {
+      authMsg(authError(err), true);
+    }
+  }
+
+  async function checkVerified() {
+    try {
+      await state.user.reload();
+      state.user = state.fb.auth.currentUser;
+      if (state.user.emailVerified) {
+        await state.user.getIdToken(true); // refresh so the server sees the verified email
+        $("authDlg").close();
+        renderMode();
+        toast("✓ " + state.user.email);
+      } else {
+        authMsg(t("auth.notYet"), true);
+      }
+    } catch (err) {
+      authMsg(authError(err), true);
+    }
+  }
+
+  async function resendVerification() {
+    try {
+      await state.user.sendEmailVerification();
+      authMsg(t("auth.resent"));
+    } catch (err) {
+      authMsg(authError(err), true);
+    }
+  }
+
+  async function signOut() {
+    await state.fb.auth.signOut();
+    state.user = null;
+    if ($("accountDlg").open) $("accountDlg").close();
+    if ($("authDlg").open) $("authDlg").close();
+    renderMode();
+  }
+
+  function openAccount() {
+    if (!state.user) { openAuth("signin", false); return; }
+    if (!state.user.emailVerified) { openAuth("verify", false); return; }
+    $("accountEmail").textContent = state.user.email || "";
+    $("accountLimit").textContent = state.dailyLimit ? t("auth.limit", { n: state.dailyLimit }) : "";
+    $("deleteAccountBtn").dataset.armed = "";
+    authMsg("", false, "accountMsg");
+    $("accountDlg").showModal();
+  }
+
+  async function deleteAccount() {
+    const btn = $("deleteAccountBtn");
+    // Firebase only lets an account be deleted shortly after signing in; check first so nothing is half-deleted.
+    const lastSignIn = Date.parse(state.user.metadata && state.user.metadata.lastSignInTime) || 0;
+    if (Date.now() - lastSignIn > 4 * 60 * 1000) { authMsg(t("auth.recent"), true, "accountMsg"); return; }
+    if (!btn.dataset.armed) { btn.dataset.armed = "1"; authMsg(t("auth.deleteConfirm"), true, "accountMsg"); return; }
+    btn.disabled = true;
+    try {
+      const snap = await storyboardsRef().limit(500).get();
+      await Promise.all(snap.docs.map((d) => d.ref.delete()));
+      await state.user.delete();
+      state.user = null;
+      LS.del("history");
+      $("accountDlg").close();
+      renderMode();
+      toast(t("auth.deleted"));
+    } catch (err) {
+      authMsg(authError(err), true, "accountMsg");
+    } finally {
+      btn.disabled = false;
+      btn.dataset.armed = "";
+    }
   }
 
   // ---------- events ----------
@@ -448,7 +701,9 @@ Respond with JSON only, in this shape:
     $("lang").addEventListener("change", (e) => {
       state.lang = e.target.value;
       if (!state.dialogTouched) state.dialogLang = LANG_NAMES[state.lang];
-      save(); applyI18n(); renderControls();
+      if (state.fb) state.fb.auth.languageCode = state.lang;
+      save(); applyI18n(); renderControls(); setAuthMode(state.authMode);
+      if (state.user && $("authDlg").open) $("verifyText").textContent = t("auth.verifyText", { email: state.user.email });
     });
 
     document.addEventListener("click", (e) => {
@@ -518,13 +773,28 @@ Respond with JSON only, in this shape:
 
     $("historyBtn").addEventListener("click", () => { renderHistory(); $("historyDlg").showModal(); });
     $("closeHistoryBtn").addEventListener("click", () => $("historyDlg").close());
-    $("clearHistoryBtn").addEventListener("click", () => { LS.del("history"); renderHistory(); });
+    $("clearHistoryBtn").addEventListener("click", clearHistory);
     $("historyList").addEventListener("click", (e) => {
       const b = e.target.closest("[data-h]");
       if (!b) return;
-      const r = LS.get("history", [])[+b.dataset.h];
+      const r = state.histList[+b.dataset.h];
       if (r) { renderResults(r); $("historyDlg").close(); $("results").scrollIntoView({ behavior: "smooth" }); }
     });
+
+    // accounts
+    $("accountBtn").addEventListener("click", openAccount);
+    $("authClose").addEventListener("click", () => $("authDlg").close());
+    $("accountClose").addEventListener("click", () => $("accountDlg").close());
+    $("authForm").addEventListener("submit", submitAuth);
+    $("googleBtn").addEventListener("click", googleSignIn);
+    $("forgotBtn").addEventListener("click", forgotPassword);
+    $("switchModeBtn").addEventListener("click", () => setAuthMode(state.authMode === "signup" ? "signin" : "signup"));
+    $("useTemplatesBtn").addEventListener("click", () => { $("authDlg").close(); generate({ template: true }); });
+    $("verifiedBtn").addEventListener("click", checkVerified);
+    $("resendBtn").addEventListener("click", resendVerification);
+    $("verifySignout").addEventListener("click", signOut);
+    $("signoutBtn").addEventListener("click", signOut);
+    $("deleteAccountBtn").addEventListener("click", deleteAccount);
 
     const theme = LS.get("theme", null);
     if (theme) document.documentElement.dataset.theme = theme;

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Forge Kuzey Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .doc { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    .doc h1 { font-size: 30px; margin: 12px 0 4px; }
+    .doc h2 { font-size: 19px; margin: 28px 0 6px; }
+    .doc p, .doc li { color: var(--ink); max-width: 65ch; }
+    .doc .muted { color: var(--muted); }
+    .doc a { color: var(--accent); }
+    .doc hr { border: 0; border-top: 1px solid var(--line); margin: 36px 0; }
+  </style>
+</head>
+<body>
+  <main class="doc">
+    <p><a href="./">← Forge Kuzey Studio</a></p>
+
+    <h1>Privacy policy</h1>
+    <p class="muted">Last updated: 15 October 2026</p>
+
+    <h2>What we store</h2>
+    <ul>
+      <li><b>Your account:</b> if you create an account, your email address (and your name and photo if you use Google sign-in) is stored by Google Firebase Authentication.</li>
+      <li><b>Your storyboards:</b> when you are signed in, the storyboards you create are saved in your account (Google Firebase Firestore) so you can see them on any device.</li>
+      <li><b>On your device:</b> your settings, your current idea and your recent storyboards are kept in your browser's local storage. They never leave your device unless you are signed in.</li>
+    </ul>
+
+    <h2>AI processing</h2>
+    <p>When the AI writes a storyboard, the idea and settings you entered are sent to Google Gemini, or to Groq as a backup, to generate the text. Don't put private personal information in your ideas.</p>
+
+    <h2>What we don't do</h2>
+    <ul>
+      <li>We don't sell your data or show ads.</li>
+      <li>We don't use tracking cookies.</li>
+      <li>Your password is handled by Firebase and is never seen or stored by this website.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>You can clear your history at any time from <b>History → Clear history</b>.</li>
+      <li>You can delete your account and all saved storyboards from your account menu (<b>Delete my account</b>).</li>
+      <li>Questions? Contact the site owner through the project's <a href="https://github.com/Kuzipilot234/Forge-Kuzey-Studio/issues" target="_blank" rel="noopener">GitHub page</a>.</li>
+    </ul>
+
+    <hr>
+
+    <h1 lang="tr">Gizlilik politikası</h1>
+    <div lang="tr">
+      <h2>Neleri saklıyoruz</h2>
+      <ul>
+        <li><b>Hesabın:</b> hesap oluşturursan e-posta adresin (Google ile girersen adın ve fotoğrafın da) Google Firebase Authentication tarafından saklanır.</li>
+        <li><b>Storyboard'ların:</b> giriş yaptığında oluşturduğun storyboard'lar hesabına (Google Firebase Firestore) kaydedilir, böylece her cihazdan görebilirsin.</li>
+        <li><b>Cihazında:</b> ayarların, mevcut fikrin ve son storyboard'ların tarayıcının yerel depolamasında tutulur. Giriş yapmadığın sürece cihazından çıkmaz.</li>
+      </ul>
+      <h2>Yapay zekâ işlemesi</h2>
+      <p>Yapay zekâ storyboard yazarken, girdiğin fikir ve ayarlar metni üretmek için Google Gemini'ye veya yedek olarak Groq'a gönderilir. Fikirlerine özel kişisel bilgiler yazma.</p>
+      <h2>Yapmadıklarımız</h2>
+      <ul>
+        <li>Verilerini satmıyoruz ve reklam göstermiyoruz.</li>
+        <li>Takip çerezleri kullanmıyoruz.</li>
+        <li>Şifren Firebase tarafından işlenir; bu site şifreni hiçbir zaman görmez veya saklamaz.</li>
+      </ul>
+      <h2>Seçeneklerin</h2>
+      <ul>
+        <li>Geçmişini istediğin zaman <b>Geçmiş → Geçmişi temizle</b> ile silebilirsin.</li>
+        <li>Hesabını ve kayıtlı tüm storyboard'larını hesap menüsünden (<b>Hesabımı sil</b>) silebilirsin.</li>
+        <li>Soruların için projenin <a href="https://github.com/Kuzipilot234/Forge-Kuzey-Studio/issues" target="_blank" rel="noopener">GitHub sayfasından</a> site sahibine ulaşabilirsin.</li>
+      </ul>
+    </div>
+  </main>
+  <script>
+    try { const th = JSON.parse(localStorage.getItem("fks_theme")); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+  </script>
+</body>
+</html>

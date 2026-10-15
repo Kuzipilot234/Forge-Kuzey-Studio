@@ -220,3 +220,26 @@ dialog::backdrop { background: rgba(10, 12, 18, .5); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- accounts ---------- */
+.account-btn { font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-btn .avatar { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 12px; margin-right: 4px; vertical-align: -5px; }
+.dlg.auth { position: relative; display: grid; gap: 12px; }
+.dlg-x { position: absolute; top: 12px; right: 12px; background: none; border: 0; font-size: 18px; color: var(--muted); padding: 4px 8px; }
+.auth-note { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; margin: 0; font-size: 14.5px; }
+.auth-note .link-btn { display: block; padding-top: 4px; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px; font-weight: 600; }
+.google-btn:hover { border-color: var(--accent); }
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+#authForm { display: grid; gap: 12px; }
+#authForm label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+#authForm input { font-weight: 400; }
+#authForm .hint { font-weight: 400; margin: 0; }
+.auth-links { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.auth-links .link-btn { padding: 0; font-size: 14px; }
+.stack { display: grid; gap: 8px; }
+.auth-msg { margin: 0; font-size: 14px; color: var(--muted); min-height: 1.2em; }
+.auth-msg.err { color: var(--warn); }
+.danger-link { background: none; border: 0; color: var(--warn); font-size: 14px; padding: 6px; }
+.foot a { color: inherit; }
